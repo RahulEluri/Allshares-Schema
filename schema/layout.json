@@ -1,0 +1,148 @@
+{
+  "positions": {
+    "bridge_field_check": {
+      "x": 820,
+      "y": 675
+    },
+    "company_breakdown": {
+      "x": 2020,
+      "y": 352
+    },
+    "company_holder": {
+      "x": 2020,
+      "y": 138
+    },
+    "company_name_alias": {
+      "x": 2020,
+      "y": 0
+    },
+    "dim_check": {
+      "x": 820,
+      "y": 423
+    },
+    "dim_company": {
+      "x": 1120,
+      "y": 0
+    },
+    "dim_field": {
+      "x": 820,
+      "y": 0
+    },
+    "dim_source": {
+      "x": 1420,
+      "y": 0
+    },
+    "fact_check_result": {
+      "x": 1420,
+      "y": 827
+    },
+    "fact_company_year": {
+      "x": null,
+      "y": null
+    },
+    "fact_field_value": {
+      "x": 1420,
+      "y": 290
+    },
+    "fact_pay_line": {
+      "x": null,
+      "y": null
+    },
+    "fact_pay_policy": {
+      "x": null,
+      "y": null
+    },
+    "pay_line_total_component": {
+      "x": 2020,
+      "y": 566
+    },
+    "ref_accounting_basis": {
+      "x": 0,
+      "y": 525
+    },
+    "ref_check_result": {
+      "x": 250,
+      "y": 1750
+    },
+    "ref_controlling_owner": {
+      "x": 250,
+      "y": 525
+    },
+    "ref_country": {
+      "x": 0,
+      "y": 0
+    },
+    "ref_country_currency": {
+      "x": 250,
+      "y": 0
+    },
+    "ref_currency": {
+      "x": 0,
+      "y": 175
+    },
+    "ref_exchange": {
+      "x": 250,
+      "y": 175
+    },
+    "ref_exchange_segment": {
+      "x": 0,
+      "y": 350
+    },
+    "ref_holder_list_cutoff": {
+      "x": 250,
+      "y": 1050
+    },
+    "ref_listing_status": {
+      "x": 250,
+      "y": 350
+    },
+    "ref_lti_basis": {
+      "x": 0,
+      "y": 1575
+    },
+    "ref_market_cap_band": {
+      "x": 250,
+      "y": 700
+    },
+    "ref_ownership_type": {
+      "x": 0,
+      "y": 700
+    },
+    "ref_pct_of": {
+      "x": 250,
+      "y": 1225
+    },
+    "ref_pension_type": {
+      "x": 250,
+      "y": 875
+    },
+    "ref_period_coverage": {
+      "x": 0,
+      "y": 1050
+    },
+    "ref_quote_match": {
+      "x": 0,
+      "y": 1750
+    },
+    "ref_role_disclosure": {
+      "x": 0,
+      "y": 875
+    },
+    "ref_share_count_basis": {
+      "x": 0,
+      "y": 1225
+    },
+    "ref_source_type": {
+      "x": 250,
+      "y": 1400
+    },
+    "ref_sti_max_basis": {
+      "x": 250,
+      "y": 1575
+    },
+    "ref_units": {
+      "x": 0,
+      "y": 1400
+    }
+  }
+}
