@@ -1,0 +1,360 @@
+# The draft star schema generated on first import (brief §5).
+#
+# Column keys:
+#   name     column name
+#   field    catalogue field it comes from (lineage, description and default type)
+#   type     BigQuery type; omitted -> derived from the field's Format
+#   mode     NULLABLE (default) | REQUIRED | REPEATED. Catalogue columns stay NULLABLE.
+#   fk       single-column FK to that table's primary key
+#   alias    CDP alias override (default: the field's Protocol Map column)
+#   confirm  true for the † columns that are not in the field catalogue
+#   rule     validation rule {kind: range|pattern, ...}
+#   description  used when there is no field, or to override it
+
+ref_tables:
+  # name: [description, extra columns]
+  ref_country: {description: "Countries (ISO 3166-1 alpha-2)", extra: [{name: region, description: "Region grouping"}]}
+  ref_country_currency: {description: "Each country's own currency, for check CUR-1. code = country code.", extra: [{name: currency_code, description: "ISO 4217 currency of the country"}]}
+  ref_currency: {description: "Currencies (ISO 4217)"}
+  ref_exchange: {description: "Exchanges (ISO 10383 MIC)"}
+  ref_exchange_segment: {description: "Exchange market segments"}
+  ref_listing_status: {description: "Listing status"}
+  ref_accounting_basis: {description: "Accounting standards"}
+  ref_controlling_owner: {description: "Controlling owner types (see Conflicts: two meanings)"}
+  ref_ownership_type: {description: "Ownership types"}
+  ref_market_cap_band: {description: "Market cap bands"}
+  ref_role_disclosure: {description: "Who a pay line discloses"}
+  ref_pension_type: {description: "Executive pension types"}
+  ref_period_coverage: {description: "Pay period coverage"}
+  ref_holder_list_cutoff: {description: "How the largest-holders list was cut off"}
+  ref_share_count_basis: {description: "Basis of the share count"}
+  ref_pct_of: {description: "What a percentage is a percentage of"}
+  ref_units: {description: "Reporting units (units, thousands, millions)"}
+  ref_source_type: {description: "Source document types"}
+  ref_lti_basis: {description: "Basis of an LTI value (Conor 02 Nov, LTI basis)"}
+  ref_sti_max_basis: {description: "How maximum STI is stated (Conor 02 Nov, STI basis)"}
+  ref_quote_match: {description: "Result of the quote check (Conor 02 Nov, quote matching)"}
+  ref_check_result: {description: "Outcome of a check"}
+
+# Fixed Sets field -> ref table, for fields whose column has no FK in the draft.
+fixed_set_targets:
+  months_in_role: null          # a rule, not a list
+  sector_code: null             # a rule, not a list
+fixed_set_rules: [months_in_role, sector_code]
+
+# Seeds that do not come from Fixed Sets.
+static_seeds:
+  ref_check_result:
+    list_source: "Schema playground brief §5b"
+    status: "In use"
+    rows:
+      - {code: pass, label: Pass, meaning: "The check passed"}
+      - {code: fail, label: Fail, meaning: "The check failed"}
+      - {code: review, label: Review, meaning: "A person must review the value"}
+      - {code: incomplete, label: Incomplete, meaning: "The document does not state the inputs; reason recorded"}
+      - {code: not_run, label: Not run, meaning: "The check was not run (e.g. NUM-04 until ranges are approved)"}
+
+parked_fields:
+  - {name: year_of_birth, format: Year, grain: Role, module: Pay and role, data_category: Role and disclosure, description: "Year of birth of the person in the role", note: "Conor 02 Nov: add or park (needed for AGE-1)"}
+  - {name: role_start_year, format: Year, grain: Role, module: Pay and role, data_category: Role and disclosure, description: "Year the person started in the current role", note: "Conor 02 Nov: add or park (needed for AGE-2)"}
+  - {name: year_joined, format: Year, grain: Role, module: Pay and role, data_category: Role and disclosure, description: "Year the person joined the company", note: "Conor 02 Nov: add or park (needed for AGE-3)"}
+
+conor_field_grain:
+  ownership_as_of: Company
+  quote_match: Value
+  default: Role
+
+tables:
+  # ------------------------------------------------------------------ catalogue
+  - name: dim_field
+    layer: catalogue
+    grain: one row per catalogue field
+    description: The field catalogue (Book1 plus Conor's tracker fields)
+    pk: [field_name]
+    columns:
+      - {name: field_name, mode: REQUIRED, description: "Field name (stable key)"}
+      - {name: protocol_id}
+      - {name: cdp_column, description: "CDP column per the Protocol Map"}
+      - {name: module}
+      - {name: data_category}
+      - {name: grain}
+      - {name: field_type, description: "direct or derived"}
+      - {name: format}
+      - {name: description}
+      - {name: read_from}
+      - {name: method}
+      - {name: priority}
+      - {name: requirement}
+      - {name: severity}
+      - {name: fill_of_50, type: INT64}
+      - {name: note}
+      - {name: status, description: "active, new or parked"}
+
+  - name: dim_check
+    layer: catalogue
+    grain: one row per check or rule
+    description: The check catalogue (All Checks plus Conor's rules)
+    pk: [check_code]
+    columns:
+      - {name: check_code, mode: REQUIRED}
+      - {name: check_name}
+      - {name: check_fx, description: "direct or derived"}
+      - {name: check_type, description: "hard or soft"}
+      - {name: applies_to_categories, description: "Comma-separated data categories"}
+      - {name: parent_gate, description: "Parent gate(s) for Conor's rules, comma-separated"}
+      - {name: status, description: "active, hold_off, to_do, confirmed or existing"}
+      - {name: remarks}
+
+  - name: bridge_field_check
+    layer: catalogue
+    grain: one row per field and check
+    description: Which checks apply to which fields
+    pk: [field_name, check_code]
+    columns:
+      - {name: field_name, mode: REQUIRED, fk: dim_field}
+      - {name: check_code, mode: REQUIRED, fk: dim_check}
+      - {name: pass_criteria}
+      - {name: fail_criteria}
+      - {name: example}
+      - {name: reference}
+      - {name: remarks}
+      - {name: score, type: NUMERIC}
+      - {name: weight, type: NUMERIC, description: "Weighted score for the module"}
+
+  # ------------------------------------------------------------------ delivery: dims
+  - name: dim_company
+    layer: dim
+    grain: one row per company
+    description: Stable company attributes
+    pk: [company_id]
+    columns:
+      - {name: company_id, mode: REQUIRED, description: "CDP company ID"}
+      - {name: legal_name, field: legal_name}
+      - {name: lei, field: lei}
+      - {name: business_id, field: business_id}
+      - {name: cik, field: cik}
+      - {name: country_code, field: country_code, fk: ref_country}
+      - {name: head_office_city, field: head_office_city}
+      - {name: website, field: website}
+      - {name: isin, field: isin}
+      - {name: ticker, field: ticker}
+      - {name: exchange, field: exchange, fk: ref_exchange}
+      - {name: exchange_segment, field: exchange_segment, fk: ref_exchange_segment}
+      - {name: listing_status, field: listing_status, fk: ref_listing_status}
+      - {name: listing_date, field: listing_date, type: DATE}
+      - {name: sector_code, field: sector_code, rule: {kind: pattern, pattern: '^\d{2}\.\d{2}$', description: "NACE class 'NN.NN'"}}
+      - {name: sector_code_scheme, confirm: true, description: "Which industry code scheme sector_code uses (NACE, SIC, ...)"}
+      - {name: sub_sector, field: sub_sector}
+      - {name: ultimate_parent, field: ultimate_parent}
+
+  - name: company_name_alias
+    layer: child
+    grain: one row per company per alias
+    description: Former and other names (other_names)
+    pk: [company_id, alias]
+    holds: [other_names]
+    columns:
+      - {name: company_id, mode: REQUIRED, fk: dim_company}
+      - {name: alias, mode: REQUIRED, field: other_names}
+
+  # ------------------------------------------------------------------ provenance
+  - name: dim_source
+    layer: provenance
+    grain: one row per source document
+    description: Registered source documents (e.g. AR-2025-SYD)
+    pk: [source_id]
+    columns:
+      - {name: source_id, mode: REQUIRED, description: "Source ID, e.g. AR-2025-SYD"}
+      - {name: company_id, fk: dim_company}
+      - {name: source_type}
+      - {name: fiscal_year, type: INT64}
+      - {name: title}
+      - {name: url}
+      - {name: gcs_path}
+      - {name: publish_date, type: DATE}
+      - {name: language}
+      - {name: retrieved_at, type: TIMESTAMP}
+
+  # ------------------------------------------------------------------ delivery: facts
+  - name: fact_company_year
+    layer: fact
+    grain: one row per company per fiscal year
+    description: Company values that change per fiscal year
+    pk: [company_id, fiscal_year]
+    columns:
+      - {name: company_id, mode: REQUIRED, fk: dim_company}
+      - {name: fiscal_year, mode: REQUIRED, field: fiscal_year, type: INT64}
+      - {name: fiscal_year_end, field: fiscal_year_end, type: DATE}
+      - {name: reporting_currency, field: reporting_currency, fk: ref_currency}
+      - {name: units, confirm: true, fk: ref_units, description: "Units the financials are stated in"}
+      - {name: accounting_basis, field: accounting_basis, fk: ref_accounting_basis}
+      - {name: revenue, field: revenue, type: NUMERIC}
+      - {name: total_assets, field: total_assets, type: NUMERIC}
+      - {name: ebitda, field: ebitda, type: NUMERIC}
+      - {name: ebitda_basis, confirm: true, description: "EBITDA or operating profit (which one ebitda holds)"}
+      - {name: shares_outstanding, field: shares_outstanding, type: INT64}
+      - {name: share_price, field: share_price, type: NUMERIC}
+      - {name: market_cap_band, field: market_cap_band, fk: ref_market_cap_band}
+      - {name: headcount, field: headcount, type: INT64}
+      - {name: fte, field: fte, type: NUMERIC}
+      - {name: controlling_owner, field: controlling_owner, fk: ref_controlling_owner}
+      - {name: controlling_owner_name, field: controlling_owner_name}
+      - {name: ownership_type, field: ownership_type, fk: ref_ownership_type}
+      - {name: pe_stake_5pct, field: pe_stake_5pct, type: BOOL}
+      - {name: ownership_as_of, field: ownership_as_of, type: DATE}
+      - {name: holder_list_cutoff, fk: ref_holder_list_cutoff, description: "How the largest-holders list was cut off"}
+      - {name: holder_list_n, confirm: true, type: INT64, description: "Number of holders in the list"}
+      - {name: share_count_basis, fk: ref_share_count_basis, description: "Basis of the share count used for holdings"}
+
+  - name: company_holder
+    layer: child
+    grain: one row per holder per company per fiscal year
+    description: Largest shareholders (largest_holders)
+    pk: [company_id, fiscal_year, holder_rank]
+    holds: [largest_holders]
+    columns:
+      - {name: company_id, mode: REQUIRED}
+      - {name: fiscal_year, mode: REQUIRED, type: INT64}
+      - {name: holder_rank, mode: REQUIRED, type: INT64, confirm: true, description: "Rank of the holder in the list"}
+      - {name: holder_name, field: largest_holders, type: STRING, description: "Holder name"}
+      - {name: capital_pct, field: largest_holders, type: NUMERIC, description: "% of capital"}
+      - {name: votes_pct, field: largest_holders, type: NUMERIC, description: "% of votes"}
+
+  - name: company_breakdown
+    layer: child
+    grain: one row per company, fiscal year, breakdown, metric and item
+    description: Revenue and staff split by segment or country
+    pk: [company_id, fiscal_year, breakdown_type, metric, item_name]
+    holds: [revenue_by_segment, staff_by_segment, revenue_by_country, staff_by_country]
+    columns:
+      - {name: company_id, mode: REQUIRED}
+      - {name: fiscal_year, mode: REQUIRED, type: INT64}
+      - {name: breakdown_type, mode: REQUIRED, description: "segment or country"}
+      - {name: metric, mode: REQUIRED, description: "revenue or staff"}
+      - {name: item_name, mode: REQUIRED, description: "Segment or country name"}
+      - {name: value, type: NUMERIC}
+
+  - name: fact_pay_policy
+    layer: fact
+    grain: one row per company per fiscal year
+    description: Company-level executive pay policy
+    pk: [company_id, fiscal_year]
+    columns:
+      - {name: company_id, mode: REQUIRED}
+      - {name: fiscal_year, mode: REQUIRED, type: INT64}
+      - {name: pension_type, field: pension_type, fk: ref_pension_type}
+      - {name: benefits, field: benefits}
+      - {name: shareholding_requirement, field: shareholding_requirement}
+
+  - name: fact_pay_line
+    layer: fact
+    grain: one row per disclosed pay line
+    description: Executive pay as actually paid (no annualised columns; the CDP annualises per use)
+    pk: [pay_line_id]
+    columns:
+      - {name: pay_line_id, mode: REQUIRED}
+      - {name: company_id, mode: REQUIRED}
+      - {name: fiscal_year, type: INT64}
+      - {name: role_title, field: role_disclosure, alias: role_title_internal, type: STRING, description: "Role title as disclosed"}
+      - {name: role_disclosure, field: role_disclosure, fk: ref_role_disclosure}
+      - {name: is_aggregated, field: is_aggregated, type: BOOL, alias: is_aggregated}
+      - {name: aggregate_headcount, field: aggregate_headcount, type: INT64, alias: aggregate_headcount}
+      - {name: aggregate_excludes, field: aggregate_headcount, type: STRING, alias: aggregate_excludes, description: "Who an aggregate line excludes"}
+      - {name: months_in_role, field: months_in_role, type: INT64, rule: {kind: range, min: 1, max: 12, description: "1 to 12"}}
+      - {name: period_coverage, fk: ref_period_coverage, description: "Period the pay line covers"}
+      - {name: pay_currency, field: pay_currency, fk: ref_currency}
+      - {name: units, field: pay_currency, fk: ref_units, description: "Unit of the pay table"}
+      - {name: base_salary, field: base_salary, type: NUMERIC}
+      - {name: token_salary, field: token_salary, type: BOOL}
+      - {name: benefits_value, field: benefits_value, type: NUMERIC}
+      - {name: pension_contribution, field: pension_contribution, type: NUMERIC}
+      - {name: sti_paid, field: sti_paid, type: NUMERIC}
+      - {name: sti_target_value, field: sti_target, type: NUMERIC}
+      - {name: sti_target_basis, field: sti_target, type: STRING, confirm: true, description: "What sti_target_value is stated as (% of base, months, amount)"}
+      - {name: sti_max_value, field: sti_max, type: NUMERIC}
+      - {name: sti_max_basis, field: sti_max_basis, fk: ref_sti_max_basis}
+      - {name: lti_vested, field: lti_vested, type: NUMERIC}
+      - {name: lti_granted, field: lti_granted, type: NUMERIC}
+      - {name: lti_basis, field: lti_basis, fk: ref_lti_basis}
+      - {name: lti_units, field: lti_units, type: INT64}
+      - {name: lti_face_value, field: lti_face_value, type: NUMERIC}
+      - {name: lti_fair_value, field: lti_fair_value, type: NUMERIC}
+      - {name: lti_target_value, field: lti_target, type: NUMERIC}
+      - {name: lti_target_basis, field: lti_target, type: STRING, confirm: true, description: "What lti_target_value is stated as"}
+      - {name: lti_max_value, field: lti_max, type: NUMERIC}
+      - {name: lti_max_basis, field: lti_max, type: STRING, confirm: true, description: "What lti_max_value is stated as"}
+      - {name: performance_period_start, field: performance_period_start, type: DATE}
+      - {name: performance_period_end, field: performance_period_end, type: DATE}
+      - {name: total_remuneration, field: total_remuneration, type: NUMERIC}
+
+  - name: pay_line_total_component
+    layer: child
+    grain: one row per pay line per component in its stated total
+    description: Which components the document's total includes (total_components)
+    pk: [pay_line_id, component_field]
+    holds: [total_components]
+    columns:
+      - {name: pay_line_id, mode: REQUIRED, fk: fact_pay_line}
+      - {name: component_field, mode: REQUIRED, field: total_components, type: STRING, description: "Pay field included in the total"}
+
+  # ------------------------------------------------------------------ provenance facts
+  - name: fact_field_value
+    layer: provenance
+    grain: one row per entity x field x period (x list item)
+    description: Every extracted value with its provenance. Record, do not correct.
+    pk: [value_id]
+    partition: extracted_at
+    cluster: [company_id, field_name]
+    columns:
+      - {name: value_id, mode: REQUIRED}
+      - {name: company_id, mode: REQUIRED, fk: dim_company}
+      - {name: fiscal_year, type: INT64}
+      - {name: pay_line_id, fk: fact_pay_line}
+      - {name: field_name, mode: REQUIRED, fk: dim_field}
+      - {name: item_key, description: "Holder or segment name for list fields"}
+      - {name: value_string}
+      - {name: value_numeric, type: NUMERIC}
+      - {name: value_date, type: DATE}
+      - {name: value_bool, type: BOOL}
+      - {name: currency, fk: ref_currency}
+      - {name: units, fk: ref_units}
+      - {name: source_id, fk: dim_source}
+      - {name: locator, description: "Where in the source (page, table, cell)"}
+      - {name: snippet, description: "Verbatim source text"}
+      - {name: quote_match, field: quote_match, fk: ref_quote_match}
+      - {name: as_of_date, type: DATE}
+      - {name: period_start, type: DATE}
+      - {name: period_end, type: DATE}
+      - {name: source_type, fk: ref_source_type}
+      - {name: formula_version}
+      - {name: extraction_run_id}
+      - {name: extracted_at, type: TIMESTAMP}
+
+  - name: fact_check_result
+    layer: provenance
+    grain: one row per value per check run
+    description: Check results, recorded beside the source value (never overwriting it)
+    pk: [result_id]
+    partition: checked_at
+    cluster: [company_id, field_name]
+    columns:
+      - {name: result_id, mode: REQUIRED}
+      - {name: value_id, fk: fact_field_value}
+      - {name: check_code, fk: dim_check}
+      - {name: company_id, description: "Copied from the value, for clustering"}
+      - {name: field_name, description: "Copied from the value, for clustering"}
+      - {name: result, fk: ref_check_result}
+      - {name: score, type: NUMERIC}
+      - {name: note, description: "LB-2: why a confirmed Fail is correct in the document"}
+      - {name: incomplete_reason, description: "LB-5: why the value is Incomplete"}
+      - {name: review_decision, description: "LB-4: the D&A team's decision on a Review"}
+      - {name: reviewed_by}
+      - {name: reviewed_at, type: TIMESTAMP}
+      - {name: checked_at, type: TIMESTAMP}
+
+# Composite foreign keys.
+relationships:
+  - {from: company_holder, cols: [company_id, fiscal_year], to: fact_company_year}
+  - {from: company_breakdown, cols: [company_id, fiscal_year], to: fact_company_year}
+  - {from: fact_pay_policy, cols: [company_id, fiscal_year], to: fact_company_year}
+  - {from: fact_pay_line, cols: [company_id, fiscal_year], to: fact_company_year}

@@ -1,0 +1,208 @@
+# Header-driven import mapping.
+#
+# Each dataset maps logical names to the header text used in the workbooks. Headers are
+# matched case-insensitively, ignoring extra whitespace and any "(...)" suffix, so
+# "Check Type (Hard/Soft)" matches "Check Type". A new sheet or a renamed header needs a
+# change here, not in code.
+#
+# required: true  -> import fails if the sheet is missing
+# required: false -> the sheet is optional; its absence is reported as a conflict
+
+workbooks:
+  fields_book: inputs/Book1.xlsx
+  checks_book: inputs/allshares_field_checks.xlsx
+  gates_book: inputs/Allshares_Part1_gate_reference_02Nov.xlsx
+
+datasets:
+  fields:
+    workbook: fields_book
+    sheets: [Company Data, Pay Data]
+    required: true
+    numeric_key: number          # rows without a number in this column are section headers or totals
+    columns:
+      number: ["#"]
+      name: ["Data point", "Fields", "Field"]
+      protocol_id: ["Protocol ID", "Protocol Field ID", "Field ID"]
+      category: ["Category", "Data Category"]
+      grain: ["Grain"]
+      description: ["What it is"]
+      format: ["Format"]
+      read_from: ["Read from"]
+      method: ["Method"]
+      checks_applied: ["Checks applied"]
+      note: ["Note"]
+
+  requirements:
+    workbook: fields_book
+    sheets: [Sheet1]
+    required: true
+    columns:
+      priority: ["Priority"]
+      name: ["Field", "Data point"]
+      group: ["Group"]
+      requirement: ["Requirement"]
+      severity: ["Severity"]
+      fill_of_50: ["Fill (of 50)", "Fill"]
+      why_it_matters: ["Why it matters to Allshares"]
+
+  checks:
+    workbook: checks_book
+    sheets: [All Checks]
+    required: true
+    columns:
+      code: ["Check ID", "ID"]
+      name: ["Check"]
+      check_fx: ["Check Fx"]
+      check_type: ["Check Type"]
+      applies_to: ["Applies to"]
+      fields_checked: ["Number of fields checked"]
+      remarks: ["Remarks"]
+
+  field_checks:
+    workbook: checks_book
+    sheets: [Field Checks]
+    required: true
+    columns:
+      module: ["Module"]
+      category: ["Data Category"]
+      field_name: ["Fields", "Data point", "Field"]
+      protocol_id: ["Field ID"]
+      field_type: ["Field Type"]
+      check_code: ["ID", "Check ID"]
+      check_name: ["Check"]
+      check_fx: ["Check Fx"]
+      check_type: ["Check Type"]
+      score: ["Score"]
+      weight: ["Weighted Score for module", "Weight"]
+      format: ["Format"]
+      pass_criteria: ["Pass criteria"]
+      fail_criteria: ["Fail criteria"]
+      example: ["Example"]
+      reference: ["Reference"]
+      remarks: ["Remarks"]
+
+  protocol_map:
+    workbook: checks_book
+    sheets: [Protocol Map]
+    required: true
+    columns:
+      field_name: ["Field", "Fields"]
+      category: ["Data Category"]
+      protocol_id: ["Protocol Field ID"]
+      cdp_column: ["CDP column"]
+
+  fixed_sets:
+    workbook: checks_book
+    sheets: [Fixed Sets]
+    required: false
+    columns:
+      field_name: ["Field"]
+      protocol_id: ["Field ID"]
+      category: ["Data category"]
+      checked_by: ["Checked by"]
+      allowed_value: ["Allowed value"]
+      meaning: ["Meaning / when to use", "Meaning"]
+      source_wording: ["Source wording seen in first 50 that maps here", "Source wording"]
+      count_in_50: ["Count in first 50"]
+      status: ["Status"]
+      list_source: ["List source"]
+
+  module_check:
+    workbook: checks_book
+    sheets: [Module Check]
+    required: false
+    columns:
+      module: ["Module"]
+      weight_sum: ["Sum of weighted scores"]
+      checks_in_module: ["Checks in module"]
+
+  provisional_ranges:
+    workbook: checks_book
+    sheets: [Provisional Ranges]
+    required: false
+    columns:
+      field_name: ["Field"]
+      unit: ["Unit / currency"]
+      n_values: ["Values"]
+      companies: ["Companies"]
+      min: ["Min"]
+      p05: ["5th percentile"]
+      median: ["Median"]
+      p95: ["95th percentile"]
+      max: ["Max"]
+      status: ["Status"]
+      caveat: ["Data caveat"]
+
+  range_notes:
+    workbook: checks_book
+    sheets: [Range Notes]
+    required: false
+    single_column: true          # free text, one note per row, no header
+
+  # --- Conor's changes (02 Nov gate reference) -------------------------------------------
+  conor_rules:                   # section B: new rules tied to a parent gate
+    workbook: gates_book
+    sheets: [Check rules, Conor Changes 02Nov]
+    required: false
+    columns:
+      code: ["Rule"]
+      parent_gate: ["Part 1 gate", "Parent gate"]
+      applies_when: ["Applies when"]
+      passes_when: ["Passes when"]
+      result_if_not: ["Result if not"]
+      note: ["Note"]
+
+  conor_gate_changes:            # section A: changed gates
+    workbook: gates_book
+    sheets: [Gate suggestions]
+    required: false
+    columns:
+      gate: ["Part 1 gate"]
+      today: ["Today"]
+      suggestion: ["Suggestion"]
+      why: ["Why"]
+
+  conor_fields:                  # section C: new tracker fields
+    workbook: gates_book
+    sheets: [Possible tracker fields]
+    required: false
+    columns:
+      name: ["Field"]
+      type: ["Type"]
+      meaning: ["Meaning"]
+      unblocks: ["Unblocks"]
+
+  conor_lti_basis:
+    workbook: gates_book
+    sheets: [LTI basis]
+    required: false
+    columns:
+      label: ["Document label"]
+      code: ["Basis"]
+      stored_as: ["Stored as"]
+      rule: ["Rule"]
+
+  conor_sti_basis:
+    workbook: gates_book
+    sheets: [STI basis]
+    required: false
+    columns:
+      label: ["How the document states max STI"]
+      code: ["sti_max_basis"]
+      effect: ["Effect on STI-1"]
+
+  conor_quote_matching:          # section D
+    workbook: gates_book
+    sheets: [Quote matching]
+    required: false
+    columns:
+      step: ["Step"]
+      rule: ["Rule"]
+
+  conor_load_bar:                # section E
+    workbook: gates_book
+    sheets: [Possible load bar]
+    required: false
+    columns:
+      gate: ["Gate"]
+      text: ["A possible bar for loading a company into the CDP"]
