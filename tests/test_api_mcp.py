@@ -65,7 +65,7 @@ def test_mcp_reads(mcp_store):
     assert f["placed_in"] == ["fact_pay_line.base_salary"]
     assert {"NUM-01", "NUM-12"} <= {c["code"] for c in f["checks"] if "code" in c}
     assert srv.columns_for_check("NUM-11")["rules"] == ["STI-1", "STI-2", "STI-3", "LTI-1"]
-    assert srv.get_schema_summary()["fields"] == 71
+    assert srv.get_schema_summary()["fields"] == 72
     assert srv.export_bigquery(table="dim_company")["parse_check"]["ok"]
     assert srv.import_diff()["items"] == []
     assert any(h["kind"] == "column" and h["name"] == "dim_company.head_office_city" for h in srv.search("hq_city")["hits"])
@@ -73,7 +73,7 @@ def test_mcp_reads(mcp_store):
 
 def test_api_state_export_and_dry_run(client):
     s = client.get("/api/state").json()
-    assert len(s["schema"]["tables"]) == 36 and s["conflicts"]
+    assert len(s["schema"]["tables"]) == 37 and len(s["schema"]["views"]) == 1 and s["conflicts"]
     e = client.get("/api/export").json()
     assert e["parse_check"]["ok"] and e["order"][0].startswith("ref_")
     r = client.post("/api/ops", json={"ops": [{"op": "delete_table", "table": "dim_company", "cascade": True}],

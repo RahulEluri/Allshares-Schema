@@ -11,8 +11,8 @@ from pydantic import BaseModel, ConfigDict, Field as PField, TypeAdapter
 
 from .bqtypes import type_for_format
 from .models import (
-    Cardinality, CatalogueField, Check, Column, FieldCheck, IntRange, Layer, Mode, Note,
-    RefValue, Relationship, Schema, Table, ValidationRule,
+    Cardinality, CatalogueField, Check, Column, DerivedColumn, DerivedView, FieldCheck, IntRange, Layer,
+    Mode, Note, RefValue, Relationship, Schema, Table, ValidationRule,
 )
 
 
@@ -88,6 +88,20 @@ def _rels_touching_column(s: Schema, table: str, column: str) -> list[Relationsh
     ]
 
 
+def rename_in_expression(expression: str, old: str, new: str) -> str:
+    """Rename a column reference inside a BigQuery expression (used when a source column is renamed)."""
+    import sqlglot
+    from sqlglot import exp
+
+    tree = sqlglot.parse_one(expression, read="bigquery")
+    tree = tree.transform(lambda n: exp.column(new) if isinstance(n, exp.Column) and n.name == old else n)
+    return tree.sql("bigquery")
+
+
+def _views_on(s: Schema, table: str) -> list[DerivedView]:
+    return [v for v in s.views if v.source_table == table]
+
+
 def _unique_rel_name(s: Schema, base: str) -> str:
     names = {r.name for r in s.relationships}
     if base not in names:
@@ -158,6 +172,8 @@ class RenameTable(_Op):
                 r.from_table = self.new_name
             if r.to_table == t.name:
                 r.to_table = self.new_name
+        for v in _views_on(s, t.name):
+            v.source_table = self.new_name
         t.name = self.new_name
         t.owner = ctx.owner
 
@@ -170,9 +186,12 @@ class DeleteTable(_Op):
     def apply(self, s, ctx):
         t = _table(s, self.table)
         rels = _rels_touching_table(s, t.name)
-        if rels and not self.cascade:
-            raise OpError(f"{t.name} is used by relationship(s) {', '.join(r.name for r in rels)}; pass cascade=true to delete them too")
+        views = _views_on(s, t.name)
+        if (rels or views) and not self.cascade:
+            used = [r.name for r in rels] + [f"view {v.name}" for v in views]
+            raise OpError(f"{t.name} is used by {', '.join(used)}; pass cascade=true to delete them too")
         s.relationships = [r for r in s.relationships if r not in rels]
+        s.views = [v for v in s.views if v not in views]
         s.tables = [x for x in s.tables if x.name != t.name]
 
 
@@ -254,6 +273,10 @@ class RenameColumn(_Op):
                 r.from_columns = sub(r.from_columns)
             if r.to_table == t.name:
                 r.to_columns = sub(r.to_columns)
+        for v in _views_on(s, t.name):
+            v.group_by = sub(v.group_by)
+            for dc in v.columns:
+                dc.expression = rename_in_expression(dc.expression, old, self.new_name)
         c.name = self.new_name
         c.owner = ctx.owner
 
@@ -537,6 +560,39 @@ class UnlinkFieldCheck(_Op):
         ]
 
 
+class SetView(_Op):
+    """Create or replace a derived view (values calculated from a child table)."""
+
+    op: Literal["set_view"] = "set_view"
+    name: str
+    source_table: str
+    group_by: list[str]
+    columns: list[DerivedColumn]
+    description: str = ""
+
+    def apply(self, s, ctx):
+        if s.table(self.name):
+            raise OpError(f"'{self.name}' is already a table name")
+        _table(s, self.source_table)
+        view = DerivedView(name=self.name, source_table=self.source_table, group_by=list(self.group_by),
+                           columns=[c.model_copy() for c in self.columns], description=self.description, owner=ctx.owner)
+        for i, v in enumerate(s.views):
+            if v.name == self.name:
+                s.views[i] = view
+                return
+        s.views.append(view)
+
+
+class DeleteView(_Op):
+    op: Literal["delete_view"] = "delete_view"
+    name: str
+
+    def apply(self, s, ctx):
+        if s.view(self.name) is None:
+            raise OpError(f"View '{self.name}' does not exist")
+        s.views = [v for v in s.views if v.name != self.name]
+
+
 class UpsertNote(_Op):
     op: Literal["upsert_note"] = "upsert_note"
     note: Note
@@ -569,7 +625,7 @@ Operation = Annotated[
         LinkColumnField, AddRefValue, UpdateRefValue, DeleteRefValue,
         AddField, UpdateField, AddCheck, UpdateCheck,
         LinkFieldCheck, UpdateFieldCheck, UnlinkFieldCheck,
-        UpsertNote, SetInternalReference,
+        SetView, DeleteView, UpsertNote, SetInternalReference,
     ],
     PField(discriminator="op"),
 ]

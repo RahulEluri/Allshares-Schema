@@ -20,8 +20,7 @@ ref_tables:
   ref_exchange_segment: {description: "Exchange market segments"}
   ref_listing_status: {description: "Listing status"}
   ref_accounting_basis: {description: "Accounting standards"}
-  ref_controlling_owner: {description: "Controlling owner types (see Conflicts: two meanings)"}
-  ref_ownership_type: {description: "Ownership types"}
+  ref_ownership_type: {description: "Holder / owner types (family, private equity, state, ...)"}
   ref_market_cap_band: {description: "Market cap bands"}
   ref_role_disclosure: {description: "Who a pay line discloses"}
   ref_pension_type: {description: "Executive pension types"}
@@ -35,11 +34,25 @@ ref_tables:
   ref_sti_max_basis: {description: "How maximum STI is stated (Conor 02 Nov, STI basis)"}
   ref_quote_match: {description: "Result of the quote check (Conor 02 Nov, quote matching)"}
   ref_check_result: {description: "Outcome of a check"}
+  ref_role:
+    description: "Standard roles for pay lines (role_code). List to agree with Allshares before Tier 2."
+    extra:
+      - {name: role_group, description: "executive or board"}
+      - {name: is_ceo, type: BOOL, description: "The role is the chief executive"}
+      - {name: sort_order, type: INT64, description: "Seniority order for display"}
+      - {name: source_titles, description: "Titles seen in reports that map to this code"}
 
 # Fixed Sets field -> ref table, for fields whose column has no FK in the draft.
 fixed_set_targets:
   months_in_role: null          # a rule, not a list
   sector_code: null             # a rule, not a list
+  controlling_owner: ref_ownership_type   # its type list overlaps ownership_type; controlling_owner itself is now derived
+  share_count_basis: ref_share_count_basis
+  holder_list_cutoff: ref_holder_list_cutoff
+  period_coverage: ref_period_coverage
+  units: ref_units
+  source_type: ref_source_type
+  pct_of: ref_pct_of
 fixed_set_rules: [months_in_role, sector_code]
 
 # Seeds that do not come from Fixed Sets.
@@ -53,6 +66,25 @@ static_seeds:
       - {code: review, label: Review, meaning: "A person must review the value"}
       - {code: incomplete, label: Incomplete, meaning: "The document does not state the inputs; reason recorded"}
       - {code: not_run, label: Not run, meaning: "The check was not run (e.g. NUM-04 until ranges are approved)"}
+  ref_role:
+    list_source: "Schema playground proposal, 10 Nov (to agree with Allshares)"
+    status: "Proposed: confirm with Allshares"
+    rows:
+      - {code: ceo, label: CEO, meaning: "Chief executive / managing director", extra: {role_group: executive, is_ceo: true, sort_order: 1, source_titles: "CEO; President and CEO; VD; Verkställande direktör; Toimitusjohtaja; Administrerende direktør"}}
+      - {code: deputy_ceo, label: Deputy CEO, meaning: "Deputy or vice CEO", extra: {role_group: executive, is_ceo: false, sort_order: 2, source_titles: "Deputy CEO; Vice VD; Varatoimitusjohtaja"}}
+      - {code: cfo, label: CFO, meaning: "Chief financial officer", extra: {role_group: executive, is_ceo: false, sort_order: 3, source_titles: "CFO; Finance Director; Ekonomidirektör; Talousjohtaja"}}
+      - {code: coo, label: COO, meaning: "Chief operating officer", extra: {role_group: executive, is_ceo: false, sort_order: 4, source_titles: "COO"}}
+      - {code: other_executive, label: Other executive, meaning: "Other named executive (individual line)", extra: {role_group: executive, is_ceo: false, sort_order: 5}}
+      - {code: executive_team_aggregate, label: Executive team (aggregate), meaning: "Other group management reported as one total", extra: {role_group: executive, is_ceo: false, sort_order: 6, source_titles: "Other members of group management; Övriga ledande befattningshavare; Muu johtoryhmä"}}
+      - {code: board_chair, label: Board chair, meaning: "Chair of the board", extra: {role_group: board, is_ceo: false, sort_order: 7, source_titles: "Chair; Chairman; Styrelseordförande; Hallituksen puheenjohtaja"}}
+      - {code: board_vice_chair, label: Board vice chair, meaning: "Vice chair of the board", extra: {role_group: board, is_ceo: false, sort_order: 8}}
+      - {code: board_member, label: Board member, meaning: "Non-executive board member", extra: {role_group: board, is_ceo: false, sort_order: 9, source_titles: "Board member; Styrelseledamot; Hallituksen jäsen"}}
+      - {code: employee_representative, label: Employee representative, meaning: "Employee-elected board member", extra: {role_group: board, is_ceo: false, sort_order: 10}}
+      - {code: board_aggregate, label: Board (aggregate), meaning: "Board fees reported as one total", extra: {role_group: board, is_ceo: false, sort_order: 11}}
+
+# Fields added in the playground (not yet in the workbooks).
+extra_fields:
+  - {name: role_code, format: Code, grain: Role, module: Pay and role, data_category: Role and disclosure, description: "Standard role of the pay line; the primary role when one line covers several roles", note: "Added 10 Nov; list in ref_role, to agree with Allshares before Tier 2", status: new}
 
 parked_fields:
   - {name: year_of_birth, format: Year, grain: Role, module: Pay and role, data_category: Role and disclosure, description: "Year of birth of the person in the role", note: "Conor 02 Nov: add or park (needed for AGE-1)"}
@@ -197,28 +229,27 @@ tables:
       - {name: market_cap_band, field: market_cap_band, fk: ref_market_cap_band}
       - {name: headcount, field: headcount, type: INT64}
       - {name: fte, field: fte, type: NUMERIC}
-      - {name: controlling_owner, field: controlling_owner, fk: ref_controlling_owner}
-      - {name: controlling_owner_name, field: controlling_owner_name}
-      - {name: ownership_type, field: ownership_type, fk: ref_ownership_type}
-      - {name: pe_stake_5pct, field: pe_stake_5pct, type: BOOL}
-      - {name: ownership_as_of, field: ownership_as_of, type: DATE}
-      - {name: holder_list_cutoff, fk: ref_holder_list_cutoff, description: "How the largest-holders list was cut off"}
-      - {name: holder_list_n, confirm: true, type: INT64, description: "Number of holders in the list"}
-      - {name: share_count_basis, fk: ref_share_count_basis, description: "Basis of the share count used for holdings"}
+      # Ownership and control lives in company_holder; controlling owner etc. are calculated in v_company_ownership.
 
   - name: company_holder
     layer: child
     grain: one row per holder per company per fiscal year
-    description: Largest shareholders (largest_holders)
+    description: Largest shareholders with their holdings. Controlling owner, ownership type and PE stake are calculated from this table (v_company_ownership).
     pk: [company_id, fiscal_year, holder_rank]
     holds: [largest_holders]
     columns:
       - {name: company_id, mode: REQUIRED}
       - {name: fiscal_year, mode: REQUIRED, type: INT64}
-      - {name: holder_rank, mode: REQUIRED, type: INT64, confirm: true, description: "Rank of the holder in the list"}
-      - {name: holder_name, field: largest_holders, type: STRING, description: "Holder name"}
-      - {name: capital_pct, field: largest_holders, type: NUMERIC, description: "% of capital"}
-      - {name: votes_pct, field: largest_holders, type: NUMERIC, description: "% of votes"}
+      - {name: holder_rank, mode: REQUIRED, type: INT64, confirm: true, description: "Rank of the holder in the list (1 = largest)"}
+      - {name: holder_name, field: largest_holders, type: STRING, description: "Holder name as written in the source"}
+      - {name: holder_type, field: ownership_type, fk: ref_ownership_type, description: "Type of holder (family, private equity, state, institution, ...)"}
+      - {name: capital_pct, field: largest_holders, type: NUMERIC, description: "% of share capital held"}
+      - {name: votes_pct, field: largest_holders, type: NUMERIC, description: "% of votes held"}
+      - {name: holder_group, confirm: true, description: "Group the holder is consolidated into before ranking (DER-08)"}
+      - {name: is_tied, confirm: true, type: BOOL, description: "Holder ties with another rank (DER-09: ties listed explicitly)"}
+      - {name: as_of_date, field: ownership_as_of, type: DATE, description: "As-of date of the shareholder list (DER-07: same for every holder)"}
+      - {name: share_count_basis, fk: ref_share_count_basis, description: "Basis of the percentages, e.g. shares outstanding or issued (DER-07)"}
+      - {name: list_cutoff, fk: ref_holder_list_cutoff, description: "How the list was cut off (e.g. top 10, all above 5%)"}
 
   - name: company_breakdown
     layer: child
@@ -256,6 +287,7 @@ tables:
       - {name: company_id, mode: REQUIRED}
       - {name: fiscal_year, type: INT64}
       - {name: role_title, field: role_disclosure, alias: role_title_internal, type: STRING, description: "Role title as disclosed"}
+      - {name: role_code, field: role_code, fk: ref_role, description: "Primary standard role (used for benchmarking and in the pay_line_id key); all roles are in pay_line_role"}
       - {name: role_disclosure, field: role_disclosure, fk: ref_role_disclosure}
       - {name: is_aggregated, field: is_aggregated, type: BOOL, alias: is_aggregated}
       - {name: aggregate_headcount, field: aggregate_headcount, type: INT64, alias: aggregate_headcount}
@@ -286,6 +318,20 @@ tables:
       - {name: performance_period_start, field: performance_period_start, type: DATE}
       - {name: performance_period_end, field: performance_period_end, type: DATE}
       - {name: total_remuneration, field: total_remuneration, type: NUMERIC}
+
+  - name: pay_line_role
+    layer: child
+    grain: one row per pay line per role it covers
+    description: Every role a pay line covers, e.g. "CEO and CFO" gives two rows. One row is primary and matches fact_pay_line.role_code.
+    pk: [pay_line_id, role_code]
+    columns:
+      - {name: pay_line_id, mode: REQUIRED, fk: fact_pay_line}
+      - {name: role_code, mode: REQUIRED, field: role_code, fk: ref_role, description: "Standard role covered by the pay line"}
+      - {name: is_primary, type: BOOL, description: "The role used for benchmarking (same as fact_pay_line.role_code)"}
+      - {name: role_order, type: INT64, description: "Order of the role in the disclosed title"}
+      - {name: source_title, description: "Wording for this role in the source, e.g. 'CFO' in 'CEO and CFO'"}
+      - {name: start_date, type: DATE, description: "When the role started, if the report says (part-year roles)"}
+      - {name: end_date, type: DATE, description: "When the role ended, if the report says (part-year roles)"}
 
   - name: pay_line_total_component
     layer: child
@@ -358,3 +404,20 @@ relationships:
   - {from: company_breakdown, cols: [company_id, fiscal_year], to: fact_company_year}
   - {from: fact_pay_policy, cols: [company_id, fiscal_year], to: fact_company_year}
   - {from: fact_pay_line, cols: [company_id, fiscal_year], to: fact_company_year}
+
+# Derived views: values calculated from a child table instead of being stored.
+views:
+  - name: v_company_ownership
+    source_table: company_holder
+    group_by: [company_id, fiscal_year]
+    description: Ownership and control per company and fiscal year, calculated from company_holder
+    columns:
+      - {name: holder_count, type: INT64, expression: "COUNT(*)", description: "Number of holders listed"}
+      - {name: controlling_owner, type: BOOL, field: controlling_owner, expression: "LOGICAL_OR(votes_pct >= 20)", description: "A holder has 20% or more of the votes"}
+      - {name: controlling_owner_name, type: STRING, field: controlling_owner_name, expression: "ARRAY_AGG(IF(votes_pct >= 20, holder_name, NULL) IGNORE NULLS ORDER BY votes_pct DESC LIMIT 1)[SAFE_OFFSET(0)]", description: "Largest holder with 20% or more of the votes"}
+      - {name: ownership_type, type: STRING, field: ownership_type, expression: "ARRAY_AGG(IF(votes_pct >= 20, holder_type, NULL) IGNORE NULLS ORDER BY votes_pct DESC LIMIT 1)[SAFE_OFFSET(0)]", description: "Type of the controlling owner"}
+      - {name: pe_stake_5pct, type: BOOL, field: pe_stake_5pct, expression: "LOGICAL_OR(holder_type = 'private_equity' AND capital_pct >= 5)", description: "A private equity holder has 5% or more of the capital"}
+      - {name: ownership_as_of, type: DATE, field: ownership_as_of, expression: "MAX(as_of_date)", description: "As-of date of the list"}
+      - {name: as_of_consistent, type: BOOL, expression: "COUNT(DISTINCT as_of_date) <= 1", description: "All holdings share one as-of date (DER-07)"}
+      - {name: capital_listed_pct, type: NUMERIC, expression: "SUM(capital_pct)", description: "Capital held by the listed holders (NUM-07: at most 100)"}
+      - {name: votes_listed_pct, type: NUMERIC, expression: "SUM(votes_pct)", description: "Votes held by the listed holders (NUM-07: at most 100)"}

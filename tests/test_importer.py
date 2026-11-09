@@ -47,7 +47,7 @@ def _copy_books(tmp_path) -> dict[str, Path]:
 def test_catalogue_counts(snap):
     status = [f.status for f in snap.fields]
     assert status.count("active") == 55
-    assert status.count("new") == 13          # Conor's tracker fields not already in Book1
+    assert status.count("new") == 14          # 13 Conor tracker fields not in Book1 + role_code (playground)
     assert status.count("parked") == 3
     gates = [c for c in snap.checks if c.kind == "gate"]
     assert len([c for c in gates if not c.undefined]) == 37   # All Checks
@@ -94,7 +94,7 @@ def test_draft_tables(draft):
         "fact_pay_policy", "fact_pay_line", "pay_line_total_component",
     }
     refs = {t.name for t in draft.tables if t.layer == "ref"}
-    assert len(refs) == 22 and expected <= names and len(names) == 36
+    assert len(refs) == 22 and expected <= names and len(names) == 37
     pay = draft.table("fact_pay_line")
     assert pay.column("role_title").cdp_alias == "role_title_internal"
     assert pay.column("months_in_role").validation_rule.max == 12
@@ -103,7 +103,8 @@ def test_draft_tables(draft):
     assert pay.column("base_salary").requirement == "Required"
     assert not any("annualised" in c.name for c in pay.columns)
     fcy = draft.table("fact_company_year")
-    assert fcy.primary_key == ["company_id", "fiscal_year"] and fcy.column("pe_stake_5pct").type == "BOOL"
+    assert fcy.primary_key == ["company_id", "fiscal_year"]
+    assert not {"controlling_owner", "ownership_type", "pe_stake_5pct", "holder_list_n"} & {c.name for c in fcy.columns}
     ffv = draft.table("fact_field_value")
     assert ffv.partition_by == "extracted_at" and ffv.cluster_by == ["company_id", "field_name"]
 

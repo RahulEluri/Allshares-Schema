@@ -46,7 +46,60 @@ def placed_fields(schema: Schema) -> dict[str, list[str]]:
         for f in t.holds_fields:
             if not any(p.startswith(f"{t.name}.") for p in out.get(f, [])):
                 out[f].append(t.name)
+    for v in schema.views:
+        for c in v.columns:
+            if c.field_id:
+                out[c.field_id].append(f"{v.name}.{c.name}")
     return out
+
+
+def expression_columns(expression: str) -> set[str]:
+    """Column names referenced by a BigQuery expression. Raises if it does not parse."""
+    import sqlglot
+    from sqlglot import exp
+
+    tree = sqlglot.parse_one(expression, read="bigquery", error_level=sqlglot.ErrorLevel.RAISE)
+    return {c.name for c in tree.find_all(exp.Column)}
+
+
+def _validate_views(schema: Schema, field_names: set[str]) -> list[Issue]:
+    issues: list[Issue] = []
+    table_names = {t.name for t in schema.tables}
+    for name, n in Counter(v.name for v in schema.views).items():
+        if n > 1:
+            issues.append(_err("duplicate_view", f"View name '{name}' is used {n} times", name))
+    for v in schema.views:
+        if not SNAKE.match(v.name):
+            issues.append(_err("name_not_snake_case", f"View name '{v.name}' is not snake_case", v.name))
+        if v.name in table_names:
+            issues.append(_err("duplicate_table", f"View '{v.name}' has the same name as a table", v.name))
+        src = schema.table(v.source_table)
+        if src is None:
+            issues.append(_err("view_missing_source", f"View {v.name} reads from missing table {v.source_table}", v.name))
+            continue
+        cols = {c.name for c in src.columns}
+        for g in v.group_by:
+            if g not in cols:
+                issues.append(_err("view_missing_column", f"View {v.name} groups by {g}, which is not in {src.name}", v.name, g))
+        names = list(v.group_by) + [c.name for c in v.columns]
+        for cname, n in Counter(names).items():
+            if n > 1:
+                issues.append(_err("duplicate_column", f"Column '{cname}' appears {n} times in view {v.name}", v.name, cname))
+        for c in v.columns:
+            if not SNAKE.match(c.name):
+                issues.append(_err("name_not_snake_case", f"Column '{v.name}.{c.name}' is not snake_case", v.name, c.name))
+            if not is_valid_type(c.type):
+                issues.append(_err("invalid_type", f"'{c.type}' is not a valid BigQuery type ({v.name}.{c.name})", v.name, c.name))
+            if c.field_id and c.field_id not in field_names:
+                issues.append(_err("unknown_field", f"{v.name}.{c.name} links to field '{c.field_id}', which is not in dim_field", v.name, c.name))
+            try:
+                missing = sorted(expression_columns(c.expression) - cols)
+            except Exception as e:
+                issues.append(_err("view_expression", f"{v.name}.{c.name}: expression does not parse ({str(e).splitlines()[0][:120]})", v.name, c.name))
+                continue
+            if missing:
+                issues.append(_err("view_missing_column", f"{v.name}.{c.name} uses {', '.join(missing)}, not in {src.name}", v.name, c.name))
+    return issues
 
 
 def module_weight_sums(schema: Schema) -> dict[str, float]:
@@ -150,6 +203,8 @@ def validate(schema: Schema) -> list[Issue]:
     for t in schema.tables:
         if t.layer == "fact" and t.name not in in_rel:
             issues.append(_warn("fact_no_relationship", f"Fact table {t.name} has no relationship", t.name))
+
+    issues.extend(_validate_views(schema, field_names))
 
     # --- catalogue ----------------------------------------------------------------------
     placed = placed_fields(schema)

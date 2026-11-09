@@ -5,13 +5,15 @@ import {
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { api } from "../api";
 import { LAYER_COLOR, useApp } from "../ctx";
-import type { Layer, Table } from "../types";
+import type { DerivedView, Layer, Table } from "../types";
 import { TableNode, type TableNodeType } from "./TableNode";
+import { ViewNode, type ViewNodeType } from "./ViewNode";
 
-const nodeTypes = { table: TableNode };
+const nodeTypes = { table: TableNode, view: ViewNode };
 const COL_X: Record<Layer, number> = { ref: 0, catalogue: 1, dim: 2, provenance: 3, fact: 4, child: 5, bridge: 5 };
+type AnyNode = TableNodeType | ViewNodeType;
 
-function autoLayout(tables: Table[]): Record<string, { x: number; y: number }> {
+function autoLayout(tables: Table[], views: DerivedView[]): Record<string, { x: number; y: number }> {
   const pos: Record<string, { x: number; y: number }> = {};
   const colY: Record<number, number> = {};
   const refs = tables.filter((t) => t.layer === "ref");
@@ -23,12 +25,17 @@ function autoLayout(tables: Table[]): Record<string, { x: number; y: number }> {
     pos[t.name] = { x: 520 + (col - 1) * 300, y };
     colY[col] = y + 60 + t.columns.length * 19 + 40;
   }
+  for (const v of views) {
+    const src = pos[v.source_table] ?? { x: 0, y: 0 };
+    pos[v.name] = { x: src.x + 290, y: src.y };
+  }
   return pos;
 }
 
 export function Canvas({ visible, search }: { visible: Set<Layer>; search: string }) {
   const { state, apply, selected, select, highlight, toast } = useApp();
   const { tables, relationships } = state.schema;
+  const views = useMemo(() => state.schema.views ?? [], [state.schema.views]);
   const [positions, setPositions] = useState<Record<string, { x: number; y: number }>>({});
   const saveTimer = useRef<number | undefined>(undefined);
   const rf = useReactFlow();
@@ -38,7 +45,7 @@ export function Canvas({ visible, search }: { visible: Set<Layer>; search: strin
   }, [visible, rf]);
 
   useEffect(() => {
-    const auto = autoLayout(tables);
+    const auto = autoLayout(tables, views);
     setPositions((cur) => ({ ...auto, ...state.layout.positions, ...cur }));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [state.version]);
@@ -69,28 +76,44 @@ export function Canvas({ visible, search }: { visible: Set<Layer>; search: strin
   }, [q, tables]);
   const hl = q ? searchHl : highlight;
 
-  const nodes: TableNodeType[] = useMemo(() => tables.filter((t) => visible.has(t.layer)).map((t) => ({
-    id: t.name, type: "table", position: positions[t.name] ?? { x: 0, y: 0 }, dragHandle: ".thead",
-    data: {
-      table: t, highlight: hl, selected: selected === t.name, issues: errorsByTable[t.name] ?? 0,
-      dimmed: hl.size > 0 && !hl.has(t.name),
-      fkCols: new Set(relationships.filter((r) => r.from_table === t.name).flatMap((r) => r.from_columns)),
-      onDropField, onSelect: select,
-    },
-  })), [tables, visible, positions, hl, selected, relationships, errorsByTable, onDropField, select]);
+  const layerOf = useCallback((name: string) => tables.find((t) => t.name === name)?.layer as Layer, [tables]);
+  const shownViews = useMemo(() => views.filter((v) => visible.has(layerOf(v.source_table))), [views, visible, layerOf]);
 
-  const edges: Edge[] = useMemo(() => relationships
-    .filter((r) => visible.has(tables.find((t) => t.name === r.from_table)?.layer as Layer) && visible.has(tables.find((t) => t.name === r.to_table)?.layer as Layer))
-    .map((r) => ({
-      id: r.name, source: r.from_table, target: r.to_table,
-      sourceHandle: `${r.from_columns[0]}-s`, targetHandle: `${r.to_columns[0]}-t`,
-      type: "smoothstep", markerStart: r.cardinality === "one_to_one" ? "one" : "many", markerEnd: "one",
-      label: r.from_columns.length > 1 ? `(${r.from_columns.join(", ")})` : undefined,
-      className: selected && (r.from_table === selected || r.to_table === selected) ? "edge-sel" : "",
-      data: { name: r.name },
-    })), [relationships, tables, visible, selected]);
+  const nodes: AnyNode[] = useMemo(() => [
+    ...tables.filter((t) => visible.has(t.layer)).map((t): TableNodeType => ({
+      id: t.name, type: "table", position: positions[t.name] ?? { x: 0, y: 0 }, dragHandle: ".thead",
+      data: {
+        table: t, highlight: hl, selected: selected === t.name, issues: errorsByTable[t.name] ?? 0,
+        dimmed: hl.size > 0 && !hl.has(t.name),
+        fkCols: new Set(relationships.filter((r) => r.from_table === t.name).flatMap((r) => r.from_columns)),
+        onDropField, onSelect: select,
+      },
+    })),
+    ...shownViews.map((v): ViewNodeType => ({
+      id: v.name, type: "view", position: positions[v.name] ?? { x: 0, y: 0 }, dragHandle: ".thead",
+      data: { view: v, highlight: hl, selected: selected === v.name, dimmed: hl.size > 0 && !hl.has(v.name) },
+    })),
+  ], [tables, shownViews, visible, positions, hl, selected, relationships, errorsByTable, onDropField, select]);
 
-  const onNodesChange = useCallback((changes: NodeChange<TableNodeType>[]) => {
+  const edges: Edge[] = useMemo(() => [
+    ...relationships
+      .filter((r) => visible.has(layerOf(r.from_table)) && visible.has(layerOf(r.to_table)))
+      .map((r) => ({
+        id: r.name, source: r.from_table, target: r.to_table,
+        sourceHandle: `${r.from_columns[0]}-s`, targetHandle: `${r.to_columns[0]}-t`,
+        type: "smoothstep", markerStart: r.cardinality === "one_to_one" ? "one" : "many", markerEnd: "one",
+        label: r.from_columns.length > 1 ? `(${r.from_columns.join(", ")})` : undefined,
+        className: selected && (r.from_table === selected || r.to_table === selected) ? "edge-sel" : "",
+        data: { name: r.name },
+      })),
+    ...shownViews.map((v) => ({
+      id: `view:${v.name}`, source: v.source_table, target: v.name,
+      sourceHandle: `${v.group_by[0]}-s`, targetHandle: "src", type: "smoothstep",
+      className: "edge-derive", label: "derives", deletable: false, data: { view: true },
+    })),
+  ], [relationships, shownViews, visible, selected, layerOf]);
+
+  const onNodesChange = useCallback((changes: NodeChange<AnyNode>[]) => {
     const moved = changes.filter((c) => c.type === "position" && c.position);
     if (!moved.length) return;
     setPositions((cur) => {
@@ -147,6 +170,7 @@ export function Canvas({ visible, search }: { visible: Set<Layer>; search: strin
         onNodesChange={onNodesChange} onConnect={onConnect} connectionMode={ConnectionMode.Loose}
         onNodeClick={(_, n) => select(n.id)} onPaneClick={() => select(null)}
         onEdgeDoubleClick={(_, e) => {
+          if (e.data?.view) return;
           if (window.confirm(`Delete relationship ${e.id}?`)) apply([{ op: "delete_relationship", name: e.id }], `UI: delete relationship ${e.id}`);
         }}
         minZoom={0.1} maxZoom={2} fitView fitViewOptions={{ padding: 0.05 }} proOptions={{ hideAttribution: true }}
@@ -154,7 +178,7 @@ export function Canvas({ visible, search }: { visible: Set<Layer>; search: strin
       >
         <Background gap={20} size={1} />
         <Controls showInteractive={false} />
-        <MiniMap pannable zoomable nodeColor={(n) => LAYER_COLOR[(n.data as { table: Table }).table.layer]} />
+        <MiniMap pannable zoomable nodeColor={(n) => (n.type === "view" ? "#a16207" : LAYER_COLOR[(n.data as { table: Table }).table.layer])} />
       </ReactFlow>
     </div>
   );

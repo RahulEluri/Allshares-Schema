@@ -5,6 +5,7 @@ import { AppCtx, LAYER_COLOR, type Ctx, type Toast } from "./ctx";
 import { DELIVERY, LAYERS, type AppState, type Layer, type Op } from "./types";
 import { Canvas } from "./components/Canvas";
 import { TableEditor } from "./components/TableEditor";
+import { ViewPanel } from "./components/ViewPanel";
 import { ChecksPanel, FieldTray, RefEditor } from "./components/SidePanels";
 import { ChangelogPanel, ExportPanel, ImportPanel, IssuesPanel } from "./components/BottomPanels";
 
@@ -84,6 +85,7 @@ export default function App() {
     return <div className="boot">{loadErr ? <><b>Cannot load the schema.</b><pre>{loadErr}</pre><p>Start the API: <code>uvicorn api.main:app --port 8000</code>, and run the first import if needed.</p></> : "Loading…"}</div>;
   }
   const table = state.schema.tables.find((t) => t.name === selected);
+  const view = (state.schema.views ?? []).find((v) => v.name === selected);
   const errCount = state.issues.filter((i) => i.severity === "error").length;
   const deliveryOnly = DELIVERY.every((l) => visible.has(l)) && visible.size === DELIVERY.length;
 
@@ -136,6 +138,7 @@ export default function App() {
             </section>
           </main>
           {table && <aside className="right"><TableEditor key={table.name} table={table} /></aside>}
+          {view && <aside className="right"><ViewPanel view={view} /></aside>}
         </div>
         <div className="toasts">{toasts.map((t) => <div key={t.id} className={`toast ${t.kind}`}>{t.text}</div>)}</div>
       </div>

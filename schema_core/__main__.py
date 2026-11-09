@@ -20,6 +20,9 @@ from .validation import validate
 
 
 def main(argv: list[str] | None = None) -> int:
+    for stream in (sys.stdout, sys.stderr):  # Windows consoles default to cp1252; schema text has → and †
+        if hasattr(stream, "reconfigure"):
+            stream.reconfigure(encoding="utf-8", errors="replace")
     ap = argparse.ArgumentParser(prog="python -m schema_core")
     sub = ap.add_subparsers(dest="cmd", required=True)
     p = sub.add_parser("import")

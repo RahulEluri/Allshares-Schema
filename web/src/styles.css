@@ -154,3 +154,12 @@ aside.right { width: 560px; background: var(--panel); border-left: 1px solid var
 .toasts { position: fixed; bottom: 16px; right: 16px; display: flex; flex-direction: column; gap: 6px; z-index: 50; max-width: 480px; }
 .toast { padding: 8px 12px; border-radius: 5px; background: #111827; color: #fff; box-shadow: 0 4px 12px rgba(0,0,0,.2); }
 .toast.error { background: #7f1d1d; } .toast.ok { background: #14532d; } .toast.warn { background: #78350f; }
+
+/* derived views */
+.vnode { border-style: dashed; border-color: #ca8a04; }
+.vhead { background: #a16207; }
+.edge-derive .react-flow__edge-path { stroke: #ca8a04; stroke-dasharray: 5 4; }
+.vtable { width: 100%; border-collapse: collapse; }
+.vtable th { text-align: left; color: var(--muted); font-weight: 500; }
+.vtable td { border-bottom: 1px solid #f0f2f5; padding: 4px 6px 4px 0; vertical-align: top; }
+.vtable .expr { white-space: pre-wrap; word-break: break-word; color: #7c2d12; }

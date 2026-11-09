@@ -36,5 +36,8 @@ export function columnsForCheck(state: AppState, code: string): Set<string> {
     for (const c of t.columns) if (c.field_id && fields.has(c.field_id)) { out.add(`${t.name}.${c.name}`); out.add(t.name); }
     for (const f of t.holds_fields) if (fields.has(f)) out.add(t.name);
   }
+  for (const v of state.schema.views ?? []) {
+    for (const c of v.columns) if (c.field_id && fields.has(c.field_id)) { out.add(`${v.name}.${c.name}`); out.add(v.name); }
+  }
   return out;
 }

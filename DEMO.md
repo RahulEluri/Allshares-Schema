@@ -7,17 +7,19 @@ hash, a green dot when live updates are connected, and the error and conflict co
 
 ## 2. Look at the draft
 
-- The canvas shows all 36 tables, coloured by layer. Click **Delivery only** to see just `dim_company`,
-  `fact_company_year`, `fact_pay_line`, `fact_pay_policy` and their child tables.
+- The canvas shows all 37 tables, coloured by layer, plus the derived view `v_company_ownership` as a dashed card
+  linked to `company_holder`. Click **Delivery only** to see just `dim_company`, `fact_company_year`,
+  `fact_pay_line`, `fact_pay_policy` and their child tables (including `pay_line_role`).
 - Relationships are drawn as crow's foot (many) to bar (one). Double-click an edge to delete it.
 - Type `hq_city` in the search box. It finds `dim_company.head_office_city` through its CDP alias.
 
 ## 3. Conflicts and validation
 
-The bottom panel lists 0 errors, 2 warnings (MOD-1 module weights) and 10 conflicts: the two meanings of
-`controlling_owner`, the empty country list, 13 unconfirmed list values, 18 empty ref tables (no Fixed Sets
-sheet), parked fields, † columns to confirm, the undefined DER-10/11, rules hanging off "hold off" gates, and
-Protocol Map entries that are not column names.
+The bottom panel lists 0 errors, 2 warnings (MOD-1 module weights) and 10 conflicts: the ownership rules to
+confirm (20% votes for a controlling owner, 5% capital for a PE stake), the empty country list, 24 unconfirmed list
+values (Conor's lists and the proposed `ref_role`), 17 empty ref tables (no Fixed Sets sheet), parked fields,
+† columns to confirm, the undefined DER-10/11, rules hanging off "hold off" gates, and Protocol Map entries that
+are not column names.
 
 ## 4. Checks
 

@@ -330,6 +330,22 @@ def unlink_field_check(field_name: str, check_code: str, expected_version: str, 
     return _write([{"op": "unlink_field_check", "field_name": field_name, "check_code": check_code}], expected_version, reason, dry_run)
 
 
+@mcp.tool()
+def set_view(name: str, source_table: str, group_by: list[str], columns: list[dict], expected_version: str, reason: str,
+             description: str = "", dry_run: bool = False) -> dict:
+    """Create or replace a derived view calculated from a (child) table, exported as CREATE OR REPLACE VIEW.
+    columns: [{name, type, expression (BigQuery aggregate over source columns), description, field_id}].
+    Example: controlling_owner = LOGICAL_OR(votes_pct >= 20) over company_holder grouped by company_id, fiscal_year."""
+    return _write([{"op": "set_view", "name": name, "source_table": source_table, "group_by": group_by,
+                    "columns": columns, "description": description}], expected_version, reason, dry_run)
+
+
+@mcp.tool()
+def delete_view(name: str, expected_version: str, reason: str, dry_run: bool = False) -> dict:
+    """Delete a derived view."""
+    return _write([{"op": "delete_view", "name": name}], expected_version, reason, dry_run)
+
+
 def main() -> None:
     mcp.run("stdio")
 

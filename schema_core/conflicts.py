@@ -18,11 +18,19 @@ def list_conflicts(schema: Schema) -> list[dict[str, Any]]:
         out.append({"id": cid, "title": title, "detail": detail, "items": items or [], "kind": kind})
 
     co = cat.field("controlling_owner")
-    if co:
+    derived = [f"{v.name}.{c.name}" for v in schema.views for c in v.columns
+               if c.field_id in ("controlling_owner", "controlling_owner_name", "ownership_type", "pe_stake_5pct")]
+    if co and derived:
+        add("controlling_owner_meaning", "Ownership rules to confirm",
+            f"controlling_owner is calculated as yes/no (Book1: \"{co.description}\") from the holders in "
+            "company_holder; the Fixed Sets type list goes to ref_ownership_type (holder_type). Confirm: the 20% "
+            "votes threshold, that the PE 5% test uses capital, and that ref_ownership_type has the code 'private_equity'.",
+            derived)
+    elif co:
         add("controlling_owner_meaning", "controlling_owner has two meanings",
             f"Book1 describes it as \"{co.description}\", while the Fixed Sets list is a type list that overlaps "
-            "ownership_type. Modelled as an enum (FK to ref_controlling_owner) for now.",
-            ["fact_company_year.controlling_owner", "fact_company_year.ownership_type"])
+            "ownership_type.", [p for t in schema.tables for p in (f"{t.name}.{c.name}" for c in t.columns
+                                                                     if c.field_id == "controlling_owner")])
 
     country = schema.table("ref_country")
     if country is not None:

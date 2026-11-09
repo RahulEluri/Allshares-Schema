@@ -4,7 +4,7 @@ from __future__ import annotations
 from typing import Optional
 
 from ..bqtypes import type_for_format
-from ..models import Catalogue, Column, Relationship, Schema, Table, ValidationRule
+from ..models import Catalogue, Column, DerivedColumn, DerivedView, Relationship, Schema, Table, ValidationRule
 from ..operations import apply_lineage
 from .snapshot import Snapshot, load_draft_config
 
@@ -26,7 +26,8 @@ def build_draft(snap: Snapshot, cfg: Optional[dict] = None) -> Schema:
 
     for name, spec in cfg["ref_tables"].items():
         cols = [Column(name=n, mode=m, description=d) for n, m, d in REF_COLUMNS]
-        cols += [Column(name=e["name"], description=e.get("description", "")) for e in spec.get("extra", [])]
+        cols += [Column(name=e["name"], type=e.get("type", "STRING"), description=e.get("description", ""))
+                 for e in spec.get("extra", [])]
         s.tables.append(Table(name=name, layer="ref", description=spec.get("description", ""),
                               grain="one row per code", columns=cols, primary_key=["code"],
                               rows=list(snap.ref_values.get(name, []))))
@@ -73,4 +74,15 @@ def build_draft(snap: Snapshot, cfg: Optional[dict] = None) -> Schema:
         if target is None:
             raise ValueError(f"Draft relationship {rel.name} targets missing table {rel.to_table}")
         rel.to_columns = list(target.primary_key)
+
+    for v in cfg.get("views", []):
+        for c in v["columns"]:
+            if c.get("field") and c["field"] not in fields:
+                raise ValueError(f"Draft view column {v['name']}.{c['name']} links unknown field '{c['field']}'")
+        s.views.append(DerivedView(
+            name=v["name"], source_table=v["source_table"], group_by=list(v["group_by"]),
+            description=v.get("description", ""),
+            columns=[DerivedColumn(name=c["name"], type=c.get("type", "STRING"), expression=c["expression"],
+                                   description=c.get("description", ""), field_id=c.get("field")) for c in v["columns"]],
+        ))
     return s

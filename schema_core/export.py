@@ -6,7 +6,7 @@ import shutil
 import subprocess
 from typing import Any, Optional
 
-from .models import Column, Schema, Table
+from .models import Column, DerivedView, Schema, Table
 
 LAYER_GROUP = {"ref": 0, "catalogue": 1, "dim": 2, "provenance": 3, "fact": 3, "child": 4, "bridge": 4}
 SEED_TABLES = {"dim_field", "dim_check", "bridge_field_check"}
@@ -177,9 +177,37 @@ def insert_sql(schema: Schema, t: Table, project: str, dataset: str, batch: int 
     return out
 
 
+def create_view_sql(schema: Schema, v: DerivedView, project: str, dataset: str) -> str:
+    src = schema.table(v.source_table)
+    descs: list[tuple[str, str]] = []
+    for g in v.group_by:
+        col = src.column(g) if src else None
+        descs.append((g, column_description(col) if col else ""))
+    for c in v.columns:
+        f = schema.catalogue.field(c.field_id) if c.field_id else None
+        tags = [f"Derived: {c.expression}"]
+        if f and f.protocol_id:
+            tags.insert(0, f"Protocol ID: {f.protocol_id}")
+        if f and f.cdp_column:
+            tags.insert(1 if f.protocol_id else 0, f"CDP alias: {f.cdp_column}")
+        text = c.description or (f.description if f else "") or ""
+        descs.append((c.name, f"{text} [{'; '.join(tags)}]".strip()))
+    collist = ",\n".join(f"  {n} OPTIONS(description={_dq(d)})" if d else f"  {n}" for n, d in descs)
+    select = ",\n".join([f"  {g}" for g in v.group_by] + [f"  {c.expression} AS {c.name}" for c in v.columns])
+    sql = f"CREATE OR REPLACE VIEW {_q(project, dataset, v.name)} (\n{collist}\n)"
+    if v.description:
+        sql += f"\nOPTIONS(description={_dq(v.description)})"
+    sql += f"\nAS\nSELECT\n{select}\nFROM {_q(project, dataset, v.source_table)}"
+    if v.group_by:
+        sql += f"\nGROUP BY {', '.join(v.group_by)}"
+    return sql + ";"
+
+
 def export_bigquery(schema: Schema, project: str, dataset: str, location: Optional[str] = None,
                     table: Optional[str] = None, include_seeds: bool = True) -> str:
     order = table_order(schema)
+    if table and schema.view(table):
+        return create_view_sql(schema, schema.view(table), project, dataset) + "\n"
     if table:
         t = schema.table(table)
         if t is None:
@@ -199,6 +227,10 @@ def export_bigquery(schema: Schema, project: str, dataset: str, location: Option
             current = g
             parts.append("-- " + ["Ref tables", "Catalogue", "Dimensions", "Provenance and facts", "Children and bridges"][g])
         parts.append(create_table_sql(schema, t, project, dataset))
+    if schema.views:
+        parts.append("-- Derived views")
+        for v in schema.views:
+            parts.append(create_view_sql(schema, v, project, dataset))
     if include_seeds:
         parts.append("-- Seed data")
         for t in order:

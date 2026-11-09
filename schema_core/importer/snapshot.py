@@ -168,6 +168,10 @@ def build_snapshot(reader: Optional[WorkbookReader] = None, draft_cfg: Optional[
         if p["name"] not in known:
             snap.fields.append(CatalogueField(**p, status="parked", source="Conor 02 Nov (AGE rules)"))
             known.add(p["name"])
+    for p in cfg.get("extra_fields", []):
+        if p["name"] not in known:
+            snap.fields.append(CatalogueField(**{"source": "Schema playground", **p}))
+            known.add(p["name"])
 
     # ---------------------------------------------------------------- checks
     for r in ds["checks"].rows:

@@ -126,7 +126,7 @@ def get_export(table: Optional[str] = None, include_seeds: bool = True, bq: bool
     except KeyError as e:
         raise HTTPException(status_code=404, detail=str(e))
     out = {"version": version, "sql": sql, "parse_check": parse_check(sql),
-           "order": [t.name for t in table_order(schema)]}
+           "order": [t.name for t in table_order(schema)] + [v.name for v in schema.views]}
     if bq:
         out["bq_dry_run"] = bq_dry_run(sql, cfg["project"])
     return out

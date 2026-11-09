@@ -95,6 +95,30 @@ class Relationship(_Base):
     owner: Owner = "workbook"
 
 
+class DerivedColumn(_Base):
+    """A value calculated from a child table, e.g. controlling_owner from company_holder."""
+
+    name: str
+    type: str = "STRING"
+    expression: str  # BigQuery SQL over the source table's columns (aggregate per group)
+    description: str = ""
+    field_id: Optional[str] = None
+
+
+class DerivedView(_Base):
+    """Exported as CREATE OR REPLACE VIEW ... AS SELECT group_by, expressions FROM source GROUP BY group_by."""
+
+    name: str
+    source_table: str
+    group_by: list[str]
+    description: str = ""
+    columns: list[DerivedColumn] = PField(default_factory=list)
+    owner: Owner = "workbook"
+
+    def column(self, name: str) -> Optional[DerivedColumn]:
+        return next((c for c in self.columns if c.name == name), None)
+
+
 class CatalogueField(_Base):
     name: str
     protocol_id: Optional[str] = None
@@ -196,8 +220,12 @@ class Schema(_Base):
     format_version: int = 1
     tables: list[Table] = PField(default_factory=list)
     relationships: list[Relationship] = PField(default_factory=list)
+    views: list[DerivedView] = PField(default_factory=list)
     catalogue: Catalogue = PField(default_factory=Catalogue)
     internal_reference: InternalReference = PField(default_factory=InternalReference)
 
     def table(self, name: str) -> Optional[Table]:
         return next((t for t in self.tables if t.name == name), None)
+
+    def view(self, name: str) -> Optional[DerivedView]:
+        return next((v for v in self.views if v.name == name), None)

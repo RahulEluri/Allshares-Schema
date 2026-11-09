@@ -37,7 +37,16 @@ def column_checks_map(schema: Schema) -> dict[str, list[str]]:
         for c in t.columns:
             if c.field_id and by_field.get(c.field_id):
                 out[f"{t.name}.{c.name}"] = by_field[c.field_id]
+    for v in schema.views:
+        for dc in v.columns:
+            if dc.field_id and by_field.get(dc.field_id):
+                out[f"{v.name}.{dc.name}"] = by_field[dc.field_id]
     return out
+
+
+def view_summary(v) -> dict[str, Any]:
+    return {"name": v.name, "source_table": v.source_table, "group_by": v.group_by, "description": v.description,
+            "columns": [c.model_dump(exclude_none=True) for c in v.columns]}
 
 
 def table_summary(schema: Schema, t: Table) -> dict[str, Any]:
@@ -60,11 +69,15 @@ def schema_summary(schema: Schema, version: str) -> dict[str, Any]:
         "tables": len(schema.tables), "relationships": len(schema.relationships),
         "fields": len(cat.fields), "checks": len(cat.checks), "field_checks": len(cat.field_checks),
         "by_layer": dict(by_layer),
+        "views": [{"name": v.name, "source_table": v.source_table, "group_by": v.group_by,
+                   "columns": [c.name for c in v.columns]} for v in schema.views],
     }
 
 
 def get_table(schema: Schema, name: str) -> dict[str, Any]:
     t = schema.table(name)
+    if t is None and schema.view(name):
+        return {"kind": "view", **view_summary(schema.view(name))}
     if t is None:
         raise KeyError(f"Table '{name}' does not exist")
     cmap = column_checks_map(schema)
@@ -82,6 +95,7 @@ def get_table(schema: Schema, name: str) -> dict[str, Any]:
         "holds_fields": t.holds_fields, "columns": cols,
         "foreign_keys": [r.model_dump(exclude={"owner"}) for r in schema.relationships if r.from_table == t.name],
         "referenced_by": [f"{r.from_table}({', '.join(r.from_columns)})" for r in schema.relationships if r.to_table == t.name],
+        "derived_views": [view_summary(v) for v in schema.views if v.source_table == t.name],
         **({"ref_rows": len(t.rows)} if t.layer == "ref" else {}),
     }
 
@@ -98,6 +112,11 @@ def get_field(schema: Schema, name: str) -> dict[str, Any]:
 
 
 def checks_for_column(schema: Schema, table: str, column: str) -> dict[str, Any]:
+    v = schema.view(table)
+    if v is not None and v.column(column):
+        dc = v.column(column)
+        return {"column": f"{table}.{column}", "field": dc.field_id, "derived": dc.expression,
+                "checks": checks_for_field(schema, dc.field_id) if dc.field_id else []}
     t = schema.table(table)
     if t is None or t.column(column) is None:
         raise KeyError(f"Column '{table}.{column}' does not exist")
@@ -135,6 +154,13 @@ def search(schema: Schema, q: str, limit: int = 40) -> list[dict[str, Any]]:
             if m(c.name, c.description, c.cdp_alias, c.protocol_id, c.field_id):
                 hits.append({"kind": "column", "name": f"{t.name}.{c.name}", "type": c.type, "field": c.field_id,
                              "cdp_alias": c.cdp_alias, "protocol_id": c.protocol_id})
+    for v in schema.views:
+        if m(v.name, v.description):
+            hits.append({"kind": "view", "name": v.name, "source_table": v.source_table})
+        for c in v.columns:
+            if m(c.name, c.description, c.field_id, c.expression):
+                hits.append({"kind": "view_column", "name": f"{v.name}.{c.name}", "type": c.type, "field": c.field_id,
+                             "expression": c.expression})
     for f in schema.catalogue.fields:
         if m(f.name, f.description, f.cdp_column, f.protocol_id):
             hits.append({"kind": "field", "name": f.name, "protocol_id": f.protocol_id, "cdp_column": f.cdp_column, "status": f.status})

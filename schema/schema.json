@@ -1,5 +1,5 @@
 {
-  "version": "9892f601c7648508",
+  "version": "06bfda2a1c126ee5",
   "format_version": 1,
   "tables": [
     {
@@ -404,64 +404,9 @@
       "owner": "workbook"
     },
     {
-      "name": "ref_controlling_owner",
-      "layer": "ref",
-      "description": "Controlling owner types (see Conflicts: two meanings)",
-      "grain": "one row per code",
-      "columns": [
-        {
-          "name": "code",
-          "type": "STRING",
-          "mode": "REQUIRED",
-          "description": "Code (primary key)",
-          "needs_confirmation": false,
-          "owner": "workbook"
-        },
-        {
-          "name": "label",
-          "type": "STRING",
-          "mode": "NULLABLE",
-          "description": "Display label",
-          "needs_confirmation": false,
-          "owner": "workbook"
-        },
-        {
-          "name": "meaning",
-          "type": "STRING",
-          "mode": "NULLABLE",
-          "description": "Meaning / when to use",
-          "needs_confirmation": false,
-          "owner": "workbook"
-        },
-        {
-          "name": "status",
-          "type": "STRING",
-          "mode": "NULLABLE",
-          "description": "In use, Proposed (confirm with Allshares) or Review",
-          "needs_confirmation": false,
-          "owner": "workbook"
-        },
-        {
-          "name": "list_source",
-          "type": "STRING",
-          "mode": "NULLABLE",
-          "description": "Where the list comes from",
-          "needs_confirmation": false,
-          "owner": "workbook"
-        }
-      ],
-      "primary_key": [
-        "code"
-      ],
-      "cluster_by": [],
-      "holds_fields": [],
-      "rows": [],
-      "owner": "workbook"
-    },
-    {
       "name": "ref_ownership_type",
       "layer": "ref",
-      "description": "Ownership types",
+      "description": "Holder / owner types (family, private equity, state, ...)",
       "grain": "one row per code",
       "columns": [
         {
@@ -511,7 +456,7 @@
       "cluster_by": [],
       "holds_fields": [],
       "rows": [],
-      "owner": "workbook"
+      "owner": "app"
     },
     {
       "name": "ref_market_cap_band",
@@ -2244,92 +2189,6 @@
           "protocol_id": "C16",
           "needs_confirmation": false,
           "owner": "workbook"
-        },
-        {
-          "name": "controlling_owner",
-          "type": "STRING",
-          "mode": "NULLABLE",
-          "description": "Is there a holder with 20%+ of votes (yes/no)",
-          "field_id": "controlling_owner",
-          "cdp_alias": "controlling_owner",
-          "protocol_id": "C20",
-          "priority": "P2",
-          "requirement": "Required",
-          "severity": "Medium",
-          "needs_confirmation": false,
-          "owner": "workbook"
-        },
-        {
-          "name": "controlling_owner_name",
-          "type": "STRING",
-          "mode": "NULLABLE",
-          "description": "Name of the controlling owner",
-          "field_id": "controlling_owner_name",
-          "cdp_alias": "controlling_owner",
-          "protocol_id": "C20",
-          "priority": "P4",
-          "requirement": "Optional",
-          "severity": "Low",
-          "needs_confirmation": false,
-          "owner": "workbook"
-        },
-        {
-          "name": "ownership_type",
-          "type": "STRING",
-          "mode": "NULLABLE",
-          "description": "Type of controlling owner (family, PE, state, ...)",
-          "field_id": "ownership_type",
-          "cdp_alias": "has_pe_stake",
-          "protocol_id": "C20",
-          "needs_confirmation": false,
-          "owner": "workbook"
-        },
-        {
-          "name": "pe_stake_5pct",
-          "type": "BOOL",
-          "mode": "NULLABLE",
-          "description": "Private equity holder with 5%+ (yes/no)",
-          "field_id": "pe_stake_5pct",
-          "cdp_alias": "has_pe_stake",
-          "protocol_id": "C20",
-          "priority": "P3",
-          "requirement": "Optional",
-          "severity": "Medium",
-          "needs_confirmation": false,
-          "owner": "workbook"
-        },
-        {
-          "name": "ownership_as_of",
-          "type": "DATE",
-          "mode": "NULLABLE",
-          "description": "As-of date of the ownership list",
-          "field_id": "ownership_as_of",
-          "needs_confirmation": false,
-          "owner": "workbook"
-        },
-        {
-          "name": "holder_list_cutoff",
-          "type": "STRING",
-          "mode": "NULLABLE",
-          "description": "How the largest-holders list was cut off",
-          "needs_confirmation": false,
-          "owner": "workbook"
-        },
-        {
-          "name": "holder_list_n",
-          "type": "INT64",
-          "mode": "NULLABLE",
-          "description": "Number of holders in the list",
-          "needs_confirmation": true,
-          "owner": "workbook"
-        },
-        {
-          "name": "share_count_basis",
-          "type": "STRING",
-          "mode": "NULLABLE",
-          "description": "Basis of the share count used for holdings",
-          "needs_confirmation": false,
-          "owner": "workbook"
         }
       ],
       "primary_key": [
@@ -2344,7 +2203,7 @@
     {
       "name": "company_holder",
       "layer": "child",
-      "description": "Largest shareholders (largest_holders)",
+      "description": "Largest shareholders with their holdings. Controlling owner, ownership type and PE stake are calculated from this table (v_company_ownership).",
       "grain": "one row per holder per company per fiscal year",
       "columns": [
         {
@@ -2353,7 +2212,7 @@
           "mode": "REQUIRED",
           "description": "",
           "needs_confirmation": false,
-          "owner": "workbook"
+          "owner": "app"
         },
         {
           "name": "fiscal_year",
@@ -2361,21 +2220,21 @@
           "mode": "REQUIRED",
           "description": "",
           "needs_confirmation": false,
-          "owner": "workbook"
+          "owner": "app"
         },
         {
           "name": "holder_rank",
           "type": "INT64",
           "mode": "REQUIRED",
-          "description": "Rank of the holder in the list",
+          "description": "Rank of the holder in the list (1 = largest)",
           "needs_confirmation": true,
-          "owner": "workbook"
+          "owner": "app"
         },
         {
           "name": "holder_name",
           "type": "STRING",
           "mode": "NULLABLE",
-          "description": "Holder name",
+          "description": "Holder name as written in the source",
           "field_id": "largest_holders",
           "cdp_alias": "ownership_detail",
           "protocol_id": "C19",
@@ -2383,13 +2242,24 @@
           "requirement": "Optional",
           "severity": "Medium",
           "needs_confirmation": false,
-          "owner": "workbook"
+          "owner": "app"
+        },
+        {
+          "name": "holder_type",
+          "type": "STRING",
+          "mode": "NULLABLE",
+          "description": "Type of holder (family, private equity, state, institution, ...)",
+          "field_id": "ownership_type",
+          "cdp_alias": "has_pe_stake",
+          "protocol_id": "C20",
+          "needs_confirmation": false,
+          "owner": "app"
         },
         {
           "name": "capital_pct",
           "type": "NUMERIC",
           "mode": "NULLABLE",
-          "description": "% of capital",
+          "description": "% of share capital held",
           "field_id": "largest_holders",
           "cdp_alias": "ownership_detail",
           "protocol_id": "C19",
@@ -2397,13 +2267,13 @@
           "requirement": "Optional",
           "severity": "Medium",
           "needs_confirmation": false,
-          "owner": "workbook"
+          "owner": "app"
         },
         {
           "name": "votes_pct",
           "type": "NUMERIC",
           "mode": "NULLABLE",
-          "description": "% of votes",
+          "description": "% of votes held",
           "field_id": "largest_holders",
           "cdp_alias": "ownership_detail",
           "protocol_id": "C19",
@@ -2411,7 +2281,48 @@
           "requirement": "Optional",
           "severity": "Medium",
           "needs_confirmation": false,
-          "owner": "workbook"
+          "owner": "app"
+        },
+        {
+          "name": "holder_group",
+          "type": "STRING",
+          "mode": "NULLABLE",
+          "description": "Group the holder is consolidated into before ranking (DER-08)",
+          "needs_confirmation": true,
+          "owner": "app"
+        },
+        {
+          "name": "is_tied",
+          "type": "BOOL",
+          "mode": "NULLABLE",
+          "description": "Holder ties with another rank (DER-09: ties listed explicitly)",
+          "needs_confirmation": true,
+          "owner": "app"
+        },
+        {
+          "name": "as_of_date",
+          "type": "DATE",
+          "mode": "NULLABLE",
+          "description": "As-of date of the shareholder list (DER-07: same for every holder)",
+          "field_id": "ownership_as_of",
+          "needs_confirmation": false,
+          "owner": "app"
+        },
+        {
+          "name": "share_count_basis",
+          "type": "STRING",
+          "mode": "NULLABLE",
+          "description": "Basis of the percentages, e.g. shares outstanding or issued (DER-07)",
+          "needs_confirmation": false,
+          "owner": "app"
+        },
+        {
+          "name": "list_cutoff",
+          "type": "STRING",
+          "mode": "NULLABLE",
+          "description": "How the list was cut off (e.g. top 10, all above 5%)",
+          "needs_confirmation": false,
+          "owner": "app"
         }
       ],
       "primary_key": [
@@ -2424,7 +2335,7 @@
         "largest_holders"
       ],
       "rows": [],
-      "owner": "workbook"
+      "owner": "app"
     },
     {
       "name": "company_breakdown",
@@ -2606,6 +2517,15 @@
           "severity": "High",
           "needs_confirmation": false,
           "owner": "workbook"
+        },
+        {
+          "name": "role_code",
+          "type": "STRING",
+          "mode": "NULLABLE",
+          "description": "Primary standard role (used for benchmarking and in the pay_line_id key); all roles are in pay_line_role",
+          "field_id": "role_code",
+          "needs_confirmation": false,
+          "owner": "app"
         },
         {
           "name": "role_disclosure",
@@ -3318,6 +3238,317 @@
       "holds_fields": [],
       "rows": [],
       "owner": "workbook"
+    },
+    {
+      "name": "ref_role",
+      "layer": "ref",
+      "description": "Standard roles for pay lines (role_code). List to agree with Allshares before Tier 2.",
+      "grain": "one row per code",
+      "columns": [
+        {
+          "name": "code",
+          "type": "STRING",
+          "mode": "REQUIRED",
+          "description": "Code (primary key)",
+          "needs_confirmation": false,
+          "owner": "app"
+        },
+        {
+          "name": "label",
+          "type": "STRING",
+          "mode": "NULLABLE",
+          "description": "Display label",
+          "needs_confirmation": false,
+          "owner": "app"
+        },
+        {
+          "name": "meaning",
+          "type": "STRING",
+          "mode": "NULLABLE",
+          "description": "Meaning / when to use",
+          "needs_confirmation": false,
+          "owner": "app"
+        },
+        {
+          "name": "status",
+          "type": "STRING",
+          "mode": "NULLABLE",
+          "description": "In use, Proposed (confirm with Allshares) or Review",
+          "needs_confirmation": false,
+          "owner": "app"
+        },
+        {
+          "name": "list_source",
+          "type": "STRING",
+          "mode": "NULLABLE",
+          "description": "Where the list comes from",
+          "needs_confirmation": false,
+          "owner": "app"
+        },
+        {
+          "name": "role_group",
+          "type": "STRING",
+          "mode": "NULLABLE",
+          "description": "executive or board",
+          "needs_confirmation": false,
+          "owner": "app"
+        },
+        {
+          "name": "is_ceo",
+          "type": "BOOL",
+          "mode": "NULLABLE",
+          "description": "The role is the chief executive",
+          "needs_confirmation": false,
+          "owner": "app"
+        },
+        {
+          "name": "sort_order",
+          "type": "INT64",
+          "mode": "NULLABLE",
+          "description": "Seniority order for display",
+          "needs_confirmation": false,
+          "owner": "app"
+        },
+        {
+          "name": "source_titles",
+          "type": "STRING",
+          "mode": "NULLABLE",
+          "description": "Titles seen in reports that map to this code",
+          "needs_confirmation": false,
+          "owner": "app"
+        }
+      ],
+      "primary_key": [
+        "code"
+      ],
+      "cluster_by": [],
+      "holds_fields": [],
+      "rows": [
+        {
+          "code": "ceo",
+          "label": "CEO",
+          "meaning": "Chief executive / managing director",
+          "status": "Proposed: confirm with Allshares",
+          "list_source": "Schema playground proposal, 10 Nov (to agree with Allshares)",
+          "extra": {
+            "role_group": "executive",
+            "is_ceo": true,
+            "sort_order": 1,
+            "source_titles": "CEO; President and CEO; VD; Verkställande direktör; Toimitusjohtaja; Administrerende direktør"
+          },
+          "owner": "app"
+        },
+        {
+          "code": "deputy_ceo",
+          "label": "Deputy CEO",
+          "meaning": "Deputy or vice CEO",
+          "status": "Proposed: confirm with Allshares",
+          "list_source": "Schema playground proposal, 10 Nov (to agree with Allshares)",
+          "extra": {
+            "role_group": "executive",
+            "is_ceo": false,
+            "sort_order": 2,
+            "source_titles": "Deputy CEO; Vice VD; Varatoimitusjohtaja"
+          },
+          "owner": "app"
+        },
+        {
+          "code": "cfo",
+          "label": "CFO",
+          "meaning": "Chief financial officer",
+          "status": "Proposed: confirm with Allshares",
+          "list_source": "Schema playground proposal, 10 Nov (to agree with Allshares)",
+          "extra": {
+            "role_group": "executive",
+            "is_ceo": false,
+            "sort_order": 3,
+            "source_titles": "CFO; Finance Director; Ekonomidirektör; Talousjohtaja"
+          },
+          "owner": "app"
+        },
+        {
+          "code": "coo",
+          "label": "COO",
+          "meaning": "Chief operating officer",
+          "status": "Proposed: confirm with Allshares",
+          "list_source": "Schema playground proposal, 10 Nov (to agree with Allshares)",
+          "extra": {
+            "role_group": "executive",
+            "is_ceo": false,
+            "sort_order": 4,
+            "source_titles": "COO"
+          },
+          "owner": "app"
+        },
+        {
+          "code": "other_executive",
+          "label": "Other executive",
+          "meaning": "Other named executive (individual line)",
+          "status": "Proposed: confirm with Allshares",
+          "list_source": "Schema playground proposal, 10 Nov (to agree with Allshares)",
+          "extra": {
+            "role_group": "executive",
+            "is_ceo": false,
+            "sort_order": 5
+          },
+          "owner": "app"
+        },
+        {
+          "code": "executive_team_aggregate",
+          "label": "Executive team (aggregate)",
+          "meaning": "Other group management reported as one total",
+          "status": "Proposed: confirm with Allshares",
+          "list_source": "Schema playground proposal, 10 Nov (to agree with Allshares)",
+          "extra": {
+            "role_group": "executive",
+            "is_ceo": false,
+            "sort_order": 6,
+            "source_titles": "Other members of group management; Övriga ledande befattningshavare; Muu johtoryhmä"
+          },
+          "owner": "app"
+        },
+        {
+          "code": "board_chair",
+          "label": "Board chair",
+          "meaning": "Chair of the board",
+          "status": "Proposed: confirm with Allshares",
+          "list_source": "Schema playground proposal, 10 Nov (to agree with Allshares)",
+          "extra": {
+            "role_group": "board",
+            "is_ceo": false,
+            "sort_order": 7,
+            "source_titles": "Chair; Chairman; Styrelseordförande; Hallituksen puheenjohtaja"
+          },
+          "owner": "app"
+        },
+        {
+          "code": "board_vice_chair",
+          "label": "Board vice chair",
+          "meaning": "Vice chair of the board",
+          "status": "Proposed: confirm with Allshares",
+          "list_source": "Schema playground proposal, 10 Nov (to agree with Allshares)",
+          "extra": {
+            "role_group": "board",
+            "is_ceo": false,
+            "sort_order": 8
+          },
+          "owner": "app"
+        },
+        {
+          "code": "board_member",
+          "label": "Board member",
+          "meaning": "Non-executive board member",
+          "status": "Proposed: confirm with Allshares",
+          "list_source": "Schema playground proposal, 10 Nov (to agree with Allshares)",
+          "extra": {
+            "role_group": "board",
+            "is_ceo": false,
+            "sort_order": 9,
+            "source_titles": "Board member; Styrelseledamot; Hallituksen jäsen"
+          },
+          "owner": "app"
+        },
+        {
+          "code": "employee_representative",
+          "label": "Employee representative",
+          "meaning": "Employee-elected board member",
+          "status": "Proposed: confirm with Allshares",
+          "list_source": "Schema playground proposal, 10 Nov (to agree with Allshares)",
+          "extra": {
+            "role_group": "board",
+            "is_ceo": false,
+            "sort_order": 10
+          },
+          "owner": "app"
+        },
+        {
+          "code": "board_aggregate",
+          "label": "Board (aggregate)",
+          "meaning": "Board fees reported as one total",
+          "status": "Proposed: confirm with Allshares",
+          "list_source": "Schema playground proposal, 10 Nov (to agree with Allshares)",
+          "extra": {
+            "role_group": "board",
+            "is_ceo": false,
+            "sort_order": 11
+          },
+          "owner": "app"
+        }
+      ],
+      "owner": "app"
+    },
+    {
+      "name": "pay_line_role",
+      "layer": "child",
+      "description": "Every role a pay line covers, e.g. \"CEO and CFO\" gives two rows. One row is primary and matches fact_pay_line.role_code.",
+      "grain": "one row per pay line per role it covers",
+      "columns": [
+        {
+          "name": "pay_line_id",
+          "type": "STRING",
+          "mode": "REQUIRED",
+          "description": "",
+          "needs_confirmation": false,
+          "owner": "app"
+        },
+        {
+          "name": "role_code",
+          "type": "STRING",
+          "mode": "REQUIRED",
+          "description": "Standard role covered by the pay line",
+          "field_id": "role_code",
+          "needs_confirmation": false,
+          "owner": "app"
+        },
+        {
+          "name": "is_primary",
+          "type": "BOOL",
+          "mode": "NULLABLE",
+          "description": "The role used for benchmarking (same as fact_pay_line.role_code)",
+          "needs_confirmation": false,
+          "owner": "app"
+        },
+        {
+          "name": "role_order",
+          "type": "INT64",
+          "mode": "NULLABLE",
+          "description": "Order of the role in the disclosed title",
+          "needs_confirmation": false,
+          "owner": "app"
+        },
+        {
+          "name": "source_title",
+          "type": "STRING",
+          "mode": "NULLABLE",
+          "description": "Wording for this role in the source, e.g. 'CFO' in 'CEO and CFO'",
+          "needs_confirmation": false,
+          "owner": "app"
+        },
+        {
+          "name": "start_date",
+          "type": "DATE",
+          "mode": "NULLABLE",
+          "description": "When the role started, if the report says (part-year roles)",
+          "needs_confirmation": false,
+          "owner": "app"
+        },
+        {
+          "name": "end_date",
+          "type": "DATE",
+          "mode": "NULLABLE",
+          "description": "When the role ended, if the report says (part-year roles)",
+          "needs_confirmation": false,
+          "owner": "app"
+        }
+      ],
+      "primary_key": [
+        "pay_line_id",
+        "role_code"
+      ],
+      "cluster_by": [],
+      "holds_fields": [],
+      "rows": [],
+      "owner": "app"
     }
   ],
   "relationships": [
@@ -3484,58 +3715,6 @@
         "market_cap_band"
       ],
       "to_table": "ref_market_cap_band",
-      "to_columns": [
-        "code"
-      ],
-      "cardinality": "many_to_one",
-      "owner": "workbook"
-    },
-    {
-      "name": "fk_fact_company_year_controlling_owner",
-      "from_table": "fact_company_year",
-      "from_columns": [
-        "controlling_owner"
-      ],
-      "to_table": "ref_controlling_owner",
-      "to_columns": [
-        "code"
-      ],
-      "cardinality": "many_to_one",
-      "owner": "workbook"
-    },
-    {
-      "name": "fk_fact_company_year_ownership_type",
-      "from_table": "fact_company_year",
-      "from_columns": [
-        "ownership_type"
-      ],
-      "to_table": "ref_ownership_type",
-      "to_columns": [
-        "code"
-      ],
-      "cardinality": "many_to_one",
-      "owner": "workbook"
-    },
-    {
-      "name": "fk_fact_company_year_holder_list_cutoff",
-      "from_table": "fact_company_year",
-      "from_columns": [
-        "holder_list_cutoff"
-      ],
-      "to_table": "ref_holder_list_cutoff",
-      "to_columns": [
-        "code"
-      ],
-      "cardinality": "many_to_one",
-      "owner": "workbook"
-    },
-    {
-      "name": "fk_fact_company_year_share_count_basis",
-      "from_table": "fact_company_year",
-      "from_columns": [
-        "share_count_basis"
-      ],
-      "to_table": "ref_share_count_basis",
       "to_columns": [
         "code"
       ],
@@ -3848,6 +4027,157 @@
       ],
       "cardinality": "many_to_one",
       "owner": "workbook"
+    },
+    {
+      "name": "fk_company_holder_holder_type",
+      "from_table": "company_holder",
+      "from_columns": [
+        "holder_type"
+      ],
+      "to_table": "ref_ownership_type",
+      "to_columns": [
+        "code"
+      ],
+      "cardinality": "many_to_one",
+      "owner": "app"
+    },
+    {
+      "name": "fk_company_holder_share_count_basis",
+      "from_table": "company_holder",
+      "from_columns": [
+        "share_count_basis"
+      ],
+      "to_table": "ref_share_count_basis",
+      "to_columns": [
+        "code"
+      ],
+      "cardinality": "many_to_one",
+      "owner": "app"
+    },
+    {
+      "name": "fk_company_holder_list_cutoff",
+      "from_table": "company_holder",
+      "from_columns": [
+        "list_cutoff"
+      ],
+      "to_table": "ref_holder_list_cutoff",
+      "to_columns": [
+        "code"
+      ],
+      "cardinality": "many_to_one",
+      "owner": "app"
+    },
+    {
+      "name": "fk_fact_pay_line_role_code",
+      "from_table": "fact_pay_line",
+      "from_columns": [
+        "role_code"
+      ],
+      "to_table": "ref_role",
+      "to_columns": [
+        "code"
+      ],
+      "cardinality": "many_to_one",
+      "owner": "app"
+    },
+    {
+      "name": "fk_pay_line_role_pay_line_id",
+      "from_table": "pay_line_role",
+      "from_columns": [
+        "pay_line_id"
+      ],
+      "to_table": "fact_pay_line",
+      "to_columns": [
+        "pay_line_id"
+      ],
+      "cardinality": "many_to_one",
+      "owner": "app"
+    },
+    {
+      "name": "fk_pay_line_role_role_code",
+      "from_table": "pay_line_role",
+      "from_columns": [
+        "role_code"
+      ],
+      "to_table": "ref_role",
+      "to_columns": [
+        "code"
+      ],
+      "cardinality": "many_to_one",
+      "owner": "app"
+    }
+  ],
+  "views": [
+    {
+      "name": "v_company_ownership",
+      "source_table": "company_holder",
+      "group_by": [
+        "company_id",
+        "fiscal_year"
+      ],
+      "description": "Ownership and control per company and fiscal year, calculated from company_holder",
+      "columns": [
+        {
+          "name": "holder_count",
+          "type": "INT64",
+          "expression": "COUNT(*)",
+          "description": "Number of holders listed"
+        },
+        {
+          "name": "controlling_owner",
+          "type": "BOOL",
+          "expression": "LOGICAL_OR(votes_pct >= 20)",
+          "description": "A holder has 20% or more of the votes",
+          "field_id": "controlling_owner"
+        },
+        {
+          "name": "controlling_owner_name",
+          "type": "STRING",
+          "expression": "ARRAY_AGG(IF(votes_pct >= 20, holder_name, NULL) IGNORE NULLS ORDER BY votes_pct DESC LIMIT 1)[SAFE_OFFSET(0)]",
+          "description": "Largest holder with 20% or more of the votes",
+          "field_id": "controlling_owner_name"
+        },
+        {
+          "name": "ownership_type",
+          "type": "STRING",
+          "expression": "ARRAY_AGG(IF(votes_pct >= 20, holder_type, NULL) IGNORE NULLS ORDER BY votes_pct DESC LIMIT 1)[SAFE_OFFSET(0)]",
+          "description": "Type of the controlling owner",
+          "field_id": "ownership_type"
+        },
+        {
+          "name": "pe_stake_5pct",
+          "type": "BOOL",
+          "expression": "LOGICAL_OR(holder_type = 'private_equity' AND capital_pct >= 5)",
+          "description": "A private equity holder has 5% or more of the capital",
+          "field_id": "pe_stake_5pct"
+        },
+        {
+          "name": "ownership_as_of",
+          "type": "DATE",
+          "expression": "MAX(as_of_date)",
+          "description": "As-of date of the list",
+          "field_id": "ownership_as_of"
+        },
+        {
+          "name": "as_of_consistent",
+          "type": "BOOL",
+          "expression": "COUNT(DISTINCT as_of_date) <= 1",
+          "description": "All holdings share one as-of date (DER-07)"
+        },
+        {
+          "name": "capital_listed_pct",
+          "type": "NUMERIC",
+          "expression": "SUM(capital_pct)",
+          "description": "Capital held by the listed holders (NUM-07: at most 100)"
+        },
+        {
+          "name": "votes_listed_pct",
+          "type": "NUMERIC",
+          "expression": "SUM(votes_pct)",
+          "description": "Votes held by the listed holders (NUM-07: at most 100)"
+        }
+      ],
+      "owner": "app"
     }
   ],
   "catalogue": {
@@ -5008,6 +5338,18 @@
         "status": "parked",
         "source": "Conor 02 Nov (AGE rules)",
         "owner": "workbook"
+      },
+      {
+        "name": "role_code",
+        "module": "Pay and role",
+        "data_category": "Role and disclosure",
+        "grain": "Role",
+        "format": "Code",
+        "description": "Standard role of the pay line; the primary role when one line covers several roles",
+        "note": "Added 10 Nov; list in ref_role, to agree with Allshares before Tier 2",
+        "status": "new",
+        "source": "Schema playground",
+        "owner": "app"
       }
     ],
     "checks": [

@@ -34,8 +34,11 @@ export interface Check {
 
 export interface FieldCheck { field_name: string; check_code: string; module?: string; pass_criteria?: string; fail_criteria?: string; score?: number; weight?: number }
 
+export interface DerivedColumn { name: string; type: string; expression: string; description: string; field_id?: string }
+export interface DerivedView { name: string; source_table: string; group_by: string[]; description: string; columns: DerivedColumn[]; owner: string }
+
 export interface Schema {
-  tables: Table[]; relationships: Relationship[];
+  tables: Table[]; relationships: Relationship[]; views: DerivedView[];
   catalogue: { fields: Field[]; checks: Check[]; field_checks: FieldCheck[]; notes: { id: string; kind: string; title: string; text: string }[] };
 }
 
